@@ -1,631 +1,713 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, onSnapshot, collection, query, addDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-
-// Carregar ícones da Lucide React (simulação de importação para ambiente de arquivo único)
-const CalendarIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>;
-const LayoutDashboardIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>;
-const ListOrderedIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h.01"/><path d="M4 12h.01"/><path d="M4 18h.01"/></svg>;
-const AlertTriangleIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L2.3 20.72c-.45.98.05 2.05 1.11 2.05h17.18c1.06 0 1.56-1.07 1.11-2.05L13.71 3.86c-.44-.97-1.74-.97-2.18 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>;
-const XIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>;
-const PlusIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>;
-
-// --- VARIÁVEIS GLOBAIS FORNECIDAS PELO AMBIENTE ---
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
-
-// --- CONFIGURAÇÃO INICIAL DO FIREBASE ---
-let app, db, auth;
-try {
-    app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    auth = getAuth(app);
-} catch (e) {
-    console.error("Erro ao inicializar Firebase. Verifique a configuração.", e);
-}
-
-
-// --- Componente Modal para Adicionar/Editar Audiência ---
-
-const HearingModal = ({ hearing = null, onClose, db, userId }) => {
-    const [title, setTitle] = useState(hearing?.title || '');
-    const [responsible, setResponsible] = useState(hearing?.responsible || userId || '');
-    const [dateString, setDateString] = useState(() => {
-        if (hearing && hearing.date && hearing.date.seconds) {
-            return new Date(hearing.date.seconds * 1000).toISOString().slice(0, 16);
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Audiências</title>
+    <!-- Carrega o Tailwind CSS via CDN para estilização -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s;
         }
-        return '';
-    });
-    const [details, setDetails] = useState(hearing?.details || '');
-    const [status, setStatus] = useState(hearing?.status || 'Pendente');
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!db || !userId) return;
-
-        try {
-            const hearingDate = new Date(dateString);
-
-            if (isNaN(hearingDate.getTime())) {
-                console.error("Data/hora inválida.");
-                return;
-            }
-
-            const data = {
-                title,
-                responsible,
-                date: Timestamp.fromDate(hearingDate),
-                details,
-                status,
-                userId: userId // Registrar o ID do usuário que criou/modificou
-            };
-
-            const collectionRef = collection(db, `artifacts/${appId}/public/data/hearings`);
-
-            if (hearing) {
-                // Editar
-                await updateDoc(doc(collectionRef, hearing.id), data);
-                console.log("Audiência atualizada com sucesso!");
-            } else {
-                // Adicionar
-                await addDoc(collectionRef, { ...data, createdAt: Timestamp.now() });
-                console.log("Audiência adicionada com sucesso!");
-            }
-            onClose();
-
-        } catch (error) {
-            console.error("Erro ao salvar audiência: ", error);
+        /* Estilos básicos para o Kanban para garantir o scroll */
+        #kanban-container {
+            min-width: fit-content;
         }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg p-6">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{hearing ? 'Editar Audiência' : 'Nova Audiência'}</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"><XIcon className="w-6 h-6" /></button>
-                </div>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Título/Assunto</label>
-                        <input
-                            type="text"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            required
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="Ex: Audiência de Conciliação"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Responsável (Quem está Cuidando)</label>
-                        <input
-                            type="text"
-                            value={responsible}
-                            onChange={(e) => setResponsible(e.target.value)}
-                            required
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="Nome ou ID do Advogado"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Data e Hora</label>
-                        <input
-                            type="datetime-local"
-                            value={dateString}
-                            onChange={(e) => setDateString(e.target.value)}
-                            required
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status (Kanban)</label>
-                        <select
-                            value={status}
-                            onChange={(e) => setStatus(e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="Pendente">Pendente</option>
-                            <option value="Em Andamento">Em Andamento</option>
-                            <option value="Concluída">Concluída</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Detalhes/Processo</label>
-                        <textarea
-                            value={details}
-                            onChange={(e) => setDetails(e.target.value)}
-                            rows="3"
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="Número do Processo, Vara, etc."
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition duration-200"
-                    >
-                        {hearing ? 'Salvar Alterações' : 'Adicionar Audiência'}
-                    </button>
-                    {hearing && (
-                        <button
-                            type="button"
-                            onClick={async () => {
-                                if (window.confirm("Tem certeza que deseja deletar esta audiência?")) {
-                                    await deleteDoc(doc(collection(db, `artifacts/${appId}/public/data/hearings`), hearing.id));
-                                    onClose();
-                                }
-                            }}
-                            className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition duration-200 mt-2"
-                        >
-                            Excluir Audiência
-                        </button>
-                    )}
-                </form>
-            </div>
-        </div>
-    );
-};
-
-// --- Funções Auxiliares de Data/Hora ---
-
-const formatDateTime = (timestamp) => {
-    if (!timestamp || !timestamp.seconds) return 'N/A';
-    const date = new Date(timestamp.seconds * 1000);
-    return date.toLocaleDateString('pt-BR', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-    });
-};
-
-const formatTimeRemaining = (ms) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const days = Math.floor(totalSeconds / (3600 * 24));
-    const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-
-    let parts = [];
-    if (days > 0) parts.push(`${days}d`);
-    if (hours > 0 || days > 0) parts.push(`${hours}h`);
-    parts.push(`${minutes}m`);
-
-    return parts.join(' ');
-};
-
-// --- Componentes de Visualização ---
-
-const DashboardView = ({ hearings, setModalHearing, auth }) => {
-    const upcomingHearings = useMemo(() => {
-        return hearings
-            .filter(h => h.date && new Date(h.date.seconds * 1000) > new Date())
-            .sort((a, b) => a.date.seconds - b.date.seconds)
-            .slice(0, 5);
-    }, [hearings]);
-
-    const stats = useMemo(() => {
-        const total = hearings.length;
-        const pending = hearings.filter(h => h.status === 'Pendente').length;
-        const completed = hearings.filter(h => h.status === 'Concluída').length;
-        const upcoming = upcomingHearings.length;
-        return { total, pending, completed, upcoming };
-    }, [hearings, upcomingHearings]);
-
-    return (
-        <div className="p-4 space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard title="Total de Audiências" value={stats.total} icon="ListOrdered" color="blue" />
-                <StatCard title="Próximas (Em Breve)" value={stats.upcoming} icon="Calendar" color="green" />
-                <StatCard title="Status Pendente" value={stats.pending} icon="AlertTriangle" color="yellow" />
-                <StatCard title="Concluídas" value={stats.completed} icon="LayoutDashboard" color="purple" />
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
-                <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Próximas 5 Audiências</h3>
-                {upcomingHearings.length === 0 ? (
-                    <p className="text-gray-500 dark:text-gray-400">Nenhuma audiência futura agendada.</p>
-                ) : (
-                    <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {upcomingHearings.map(h => (
-                            <li key={h.id} className="py-3 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg px-2 cursor-pointer transition" onClick={() => setModalHearing(h)}>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-lg font-medium text-gray-900 dark:text-white truncate">{h.title}</p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">Responsável: {h.responsible}</p>
-                                </div>
-                                <div className="text-right ml-4">
-                                    <p className="text-base font-semibold text-blue-600 dark:text-blue-400">{formatDateTime(h.date)}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        {formatTimeRemaining(new Date(h.date.seconds * 1000).getTime() - Date.now())} restantes
-                                    </p>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
-
-             <UserDisplay auth={auth} />
-        </div>
-    );
-};
-
-const StatCard = ({ title, value, color, icon }) => {
-    const IconComponent = icon === 'Calendar' ? CalendarIcon : icon === 'AlertTriangle' ? AlertTriangleIcon : icon === 'LayoutDashboard' ? LayoutDashboardIcon : ListOrderedIcon;
-    
-    return (
-        <div className={`bg-white dark:bg-gray-800 p-5 rounded-xl shadow-lg border-l-4 border-${color}-500 transition-all hover:shadow-xl`}>
-            <div className="flex items-center">
-                <div className={`flex-shrink-0 p-3 rounded-full bg-${color}-100 dark:bg-gray-700 text-${color}-600 dark:text-${color}-400`}>
-                    <IconComponent className="w-6 h-6" />
-                </div>
-                <div className="ml-5">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{title}</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
-const CalendarView = ({ hearings, setModalHearing }) => {
-    // Nota: Em um app real, usaríamos uma lib de calendário. Aqui, simulamos uma lista agrupada.
-    const groupedHearings = useMemo(() => {
-        const groups = {};
-        hearings
-            .filter(h => h.date && new Date(h.date.seconds * 1000) >= new Date()) // Apenas futuras
-            .sort((a, b) => a.date.seconds - b.date.seconds)
-            .forEach(h => {
-                const date = new Date(h.date.seconds * 1000);
-                const dateKey = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-                if (!groups[dateKey]) groups[dateKey] = [];
-                groups[dateKey].push(h);
-            });
-        return groups;
-    }, [hearings]);
-
-    return (
-        <div className="p-4 space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Agenda de Audiências Futuras</h2>
-            {Object.keys(groupedHearings).length === 0 ? (
-                <p className="text-gray-500 dark:text-gray-400">O calendário está vazio. Adicione uma nova audiência!</p>
-            ) : (
-                Object.keys(groupedHearings).map(dateKey => (
-                    <div key={dateKey} className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                        <h3 className="text-xl font-semibold text-blue-600 dark:text-blue-400 mb-3">{dateKey}</h3>
-                        <ul className="space-y-3">
-                            {groupedHearings[dateKey].map(h => (
-                                <li key={h.id} onClick={() => setModalHearing(h)} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md hover:shadow-lg transition cursor-pointer flex justify-between items-center">
-                                    <div>
-                                        <p className="font-semibold text-lg text-gray-900 dark:text-white">{h.title} ({formatTimeRemaining(new Date(h.date.seconds * 1000).getTime() - Date.now())} restantes)</p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Hora: {new Date(h.date.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} | Resp.: {h.responsible}</p>
-                                    </div>
-                                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${h.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800' : h.status === 'Em Andamento' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
-                                        {h.status}
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                ))
-            )}
-        </div>
-    );
-};
-
-const KanbanView = ({ hearings, setModalHearing, updateHearingStatus }) => {
-    const statuses = ['Pendente', 'Em Andamento', 'Concluída'];
-
-    const categorizedHearings = useMemo(() => {
-        return statuses.reduce((acc, status) => {
-            acc[status] = hearings.filter(h => h.status === status)
-                                 .sort((a, b) => a.date.seconds - b.date.seconds); // Ordenar por data
-            return acc;
-        }, {});
-    }, [hearings]);
-
-    const handleDragStart = (e, hearingId) => {
-        e.dataTransfer.setData("hearingId", hearingId);
-    };
-
-    const handleDragOver = (e) => {
-        e.preventDefault(); // Necessário para permitir o 'drop'
-    };
-
-    const handleDrop = (e, newStatus) => {
-        e.preventDefault();
-        const hearingId = e.dataTransfer.getData("hearingId");
-        updateHearingStatus(hearingId, newStatus);
-    };
-
-    const getColumnColor = (status) => {
-        switch (status) {
-            case 'Pendente': return 'bg-yellow-500';
-            case 'Em Andamento': return 'bg-blue-500';
-            case 'Concluída': return 'bg-green-500';
-            default: return 'bg-gray-500';
+        .kanban-column {
+            height: 80vh;
         }
-    }
+        /* Estilização para o drag-and-drop */
+        .drag-over {
+            box-shadow: 0 0 0 4px #6366f1; /* Anel azul ao arrastar sobre */
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans text-gray-800 dark:text-gray-200">
 
-    return (
-        <div className="p-4 overflow-x-auto">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Kanban de Processos</h2>
-            <div className="flex space-x-4 min-w-max">
-                {statuses.map(status => (
-                    <div
-                        key={status}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, status)}
-                        className="flex-shrink-0 w-80 p-4 bg-gray-100 dark:bg-gray-700 rounded-xl shadow-inner h-[80vh] overflow-y-auto border border-gray-200 dark:border-gray-600"
-                    >
-                        <h3 className={`text-xl font-semibold mb-4 text-white p-2 rounded-lg ${getColumnColor(status)}`}>
-                            {status} ({categorizedHearings[status]?.length || 0})
-                        </h3>
-                        <div className="space-y-3">
-                            {categorizedHearings[status]?.map(h => (
-                                <div
-                                    key={h.id}
-                                    draggable
-                                    onDragStart={(e) => handleDragStart(e, h.id)}
-                                    onClick={() => setModalHearing(h)}
-                                    className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md cursor-grab transition hover:shadow-lg active:ring-4 active:ring-blue-300 dark:active:ring-blue-600"
-                                >
-                                    <p className="font-bold text-gray-900 dark:text-white truncate">{h.title}</p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 my-1">{formatDateTime(h.date)}</p>
-                                    <p className="text-xs text-blue-600 dark:text-blue-400">Resp: {h.responsible}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ))}
+    <!-- Ícones SVG (Substituindo Lucide React) -->
+    <template id="icon-calendar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+    </template>
+    <template id="icon-dashboard">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+    </template>
+    <template id="icon-list">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h.01"/><path d="M4 12h.01"/><path d="M4 18h.01"/></svg>
+    </template>
+    <template id="icon-alert">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L2.3 20.72c-.45.98.05 2.05 1.11 2.05h17.18c1.06 0 1.56-1.07 1.11-2.05L13.71 3.86c-.44-.97-1.74-.97-2.18 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    </template>
+    <template id="icon-x">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </template>
+    <template id="icon-plus">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+    </template>
+
+    <!-- Banner de Alerta (Vazio por padrão) -->
+    <div id="alert-banner" class="fixed top-4 left-1/2 -translate-x-1/2 w-full max-w-2xl z-50 p-4 hidden">
+        <div class="bg-red-500 text-white p-4 rounded-xl shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center space-y-2 md:space-y-0">
+            <div id="alert-content" class="flex items-center space-x-3">
+                <!-- Conteúdo do Alerta será injetado aqui -->
             </div>
+            <button onclick="document.getElementById('alert-banner').classList.add('hidden')" class="p-1 rounded-full hover:bg-red-600 transition">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
         </div>
-    );
-};
+    </div>
 
-// --- Componente de Alerta de 48 Horas ---
+    <!-- HEADER e NAVEGAÇÃO -->
+    <header class="bg-white dark:bg-gray-800 shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+            <h1 class="text-2xl font-extrabold text-blue-600 dark:text-blue-400">
+                Gestão de Audiências
+            </h1>
+            <button id="new-hearing-btn"
+                class="flex items-center space-x-2 py-2 px-4 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-full shadow-md transition duration-200">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                <span>Nova Audiência</span>
+            </button>
+        </div>
+    </header>
 
-const AlertBanner = ({ alerts, onClose }) => {
-    if (alerts.length === 0) return null;
-
-    return (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 w-full max-w-2xl z-50 p-4">
-            <div className="bg-red-500 text-white p-4 rounded-xl shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center space-y-2 md:space-y-0">
-                <div className="flex items-center space-x-3">
-                    <AlertTriangleIcon className="w-6 h-6 flex-shrink-0" />
-                    <div className="flex flex-col">
-                        <span className="font-bold text-lg">ALERTA DE AUDIÊNCIA (48H)!</span>
-                        {alerts.slice(0, 3).map((alert, index) => (
-                             <p key={alert.id} className="text-sm">
-                                Audiência <span className="font-semibold">{alert.title}</span> em <span className="font-semibold">{formatDateTime(alert.date)}</span>. Responsável: {alert.responsible}.
-                            </p>
-                        ))}
-                        {alerts.length > 3 && <p className="text-sm mt-1">Mais {alerts.length - 3} audiências em breve...</p>}
-                    </div>
-                </div>
-                <button onClick={onClose} className="p-1 rounded-full hover:bg-red-600 transition">
-                    <XIcon className="w-5 h-5" />
+    <nav class="bg-white dark:bg-gray-800 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex space-x-4">
+                <button data-view="dashboard" class="nav-link py-3 px-3 text-sm font-medium rounded-t-lg transition border-b-4 border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400 flex items-center space-x-2">
+                    <svg class="w-5 h-5"><use href="#icon-dashboard"></use></svg><span>Quadro Principal</span>
+                </button>
+                <button data-view="calendar" class="nav-link py-3 px-3 text-sm font-medium rounded-t-lg transition text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center space-x-2">
+                    <svg class="w-5 h-5"><use href="#icon-calendar"></use></svg><span>Calendário</span>
+                </button>
+                <button data-view="kanban" class="nav-link py-3 px-3 text-sm font-medium rounded-t-lg transition text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center space-x-2">
+                    <svg class="w-5 h-5"><use href="#icon-list"></use></svg><span>Kanban</span>
                 </button>
             </div>
         </div>
-    );
-};
+    </nav>
 
-const UserDisplay = ({ auth }) => {
-    const [user, setUser] = useState(null);
-
-    useEffect(() => {
-        if (auth) {
-            onAuthStateChanged(auth, (currentUser) => {
-                setUser(currentUser);
-            });
-        }
-    }, [auth]);
-
-    return (
-        <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl shadow border border-gray-200 dark:border-gray-600">
-            <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">Informações do Usuário Atual (Colaborativo)</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-                <span className="font-medium">ID do Usuário (UUID):</span>
-                <span className="break-all ml-2 p-1 bg-gray-200 dark:bg-gray-600 rounded text-xs font-mono">{user?.uid || 'Aguardando autenticação...'}</span>
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Use este ID para saber quem está manipulando os dados. Os dados são públicos para esta aplicação (`/public/data`).</p>
+    <!-- CONTEÚDO PRINCIPAL (Renderizado por JS) -->
+    <main class="max-w-7xl mx-auto pb-12">
+        <div id="content-area" class="p-4">
+            <!-- Conteúdo da view atual (Dashboard, Calendar, Kanban) será injetado aqui -->
+            <div id="loading-spinner" class="flex justify-center items-center h-96 text-lg text-gray-700 dark:text-gray-300">
+                <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Carregando dados...
+            </div>
         </div>
-    );
-}
+    </main>
 
-// --- Componente Principal da Aplicação ---
+    <!-- MODAL DE AUDIÊNCIA (Oculto por padrão) -->
+    <div id="hearing-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="modal-title" class="text-2xl font-bold text-gray-900 dark:text-white"></h2>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"><svg class="w-6 h-6"><use href="#icon-x"></use></svg></button>
+            </div>
+            <form id="hearing-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Título/Assunto</label>
+                    <input type="text" name="title" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Ex: Audiência de Conciliação" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Responsável (Quem está Cuidando)</label>
+                    <input type="text" name="responsible" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome ou ID do Advogado" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data e Hora</label>
+                    <input type="datetime-local" name="date" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status (Kanban)</label>
+                    <select name="status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500">
+                        <option value="Pendente">Pendente</option>
+                        <option value="Em Andamento">Em Andamento</option>
+                        <option value="Concluída">Concluída</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Detalhes/Processo</label>
+                    <textarea name="details" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Número do Processo, Vara, etc."></textarea>
+                </div>
+                <input type="hidden" name="id" />
+                <button type="submit" id="modal-submit-btn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition duration-200">
+                    Salvar
+                </button>
+                <button type="button" id="modal-delete-btn" class="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition duration-200 mt-2 hidden">
+                    Excluir Audiência
+                </button>
+            </form>
+        </div>
+    </div>
 
-const App = () => {
-    const [view, setView] = useState('dashboard'); // 'dashboard', 'calendar', 'kanban'
-    const [dbInstance, setDbInstance] = useState(null);
-    const [authInstance, setAuthInstance] = useState(null);
-    const [userId, setUserId] = useState(null);
-    const [hearings, setHearings] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [modalHearing, setModalHearing] = useState(null); // Audiência para edição (ou null para novo)
-    const [alerts, setAlerts] = useState([]);
-    const [showBanner, setShowBanner] = useState(true);
+    <!-- SCRIPT DA APLICAÇÃO -->
+    <script type="module">
+        // --- 1. CONFIGURAÇÃO DE FIREBASE E VARIÁVEIS GLOBAIS ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, query, addDoc, updateDoc, deleteDoc, Timestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // 1. Configuração e Autenticação
-    useEffect(() => {
-        if (app && db && auth) {
-            setDbInstance(db);
-            setAuthInstance(auth);
+        // setLogLevel('Debug'); // Ativar logs do Firebase se necessário
 
-            const authenticate = async () => {
-                try {
-                    if (initialAuthToken) {
-                        const userCredential = await signInWithCustomToken(auth, initialAuthToken);
-                        setUserId(userCredential.user.uid);
-                    } else {
-                        const userCredential = await signInAnonymously(auth);
-                        setUserId(userCredential.user.uid);
-                    }
-                } catch (error) {
-                    console.error("Erro na autenticação:", error);
-                    setUserId(crypto.randomUUID()); // Fallback para ID temporário
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
+
+        let app, db, auth, currentUserId;
+        let hearings = [];
+        let currentView = 'dashboard';
+
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } catch (e) {
+            console.error("Erro ao inicializar Firebase. Verifique a configuração.", e);
+        }
+
+        const contentArea = document.getElementById('content-area');
+        const modalElement = document.getElementById('hearing-modal');
+        const hearingForm = document.getElementById('hearing-form');
+        const navLinks = document.querySelectorAll('.nav-link');
+        const alertBanner = document.getElementById('alert-banner');
+        const alertContent = document.getElementById('alert-content');
+
+        // --- 2. FUNÇÕES AUXILIARES DE DATA E FORMATO ---
+
+        /** Retorna o elemento SVG clonado pelo ID. */
+        const getIcon = (id) => {
+            const template = document.getElementById(`icon-${id}`);
+            if (template) {
+                const svg = template.content.cloneNode(true).querySelector('svg');
+                return svg;
+            }
+            return null;
+        };
+
+        /** Formata o Timestamp do Firestore para exibição. */
+        const formatDateTime = (timestamp) => {
+            if (!timestamp || !timestamp.seconds) return 'N/A';
+            const date = new Date(timestamp.seconds * 1000);
+            return date.toLocaleDateString('pt-BR', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+        };
+
+        /** Calcula e formata o tempo restante (d/h/m). */
+        const formatTimeRemaining = (ms) => {
+            if (ms < 0) return 'Passou';
+            const totalSeconds = Math.floor(ms / 1000);
+            const days = Math.floor(totalSeconds / (3600 * 24));
+            const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+            let parts = [];
+            if (days > 0) parts.push(`${days}d`);
+            if (hours > 0 || days > 0) parts.push(`${hours}h`);
+            parts.push(`${minutes}m`);
+
+            return parts.join(' ');
+        };
+
+        // --- 3. LÓGICA DE ALERTA DE 48 HORAS ---
+
+        /** Verifica e renderiza o banner de alerta para audiências próximas. */
+        const checkAlerts = () => {
+            const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
+            const now = Date.now();
+
+            const activeAlerts = hearings
+                .filter(h => h.status !== 'Concluída') // Não alerta concluídas
+                .filter(hearing => {
+                    if (!hearing.date || !hearing.date.seconds) return false;
+
+                    const hearingTime = hearing.date.seconds * 1000;
+                    const timeDifference = hearingTime - now;
+
+                    return timeDifference > 0 && timeDifference <= FORTY_EIGHT_HOURS;
+                })
+                .sort((a, b) => a.date.seconds - b.date.seconds)
+                .slice(0, 5); // Limita a 5 alertas no banner
+
+            if (activeAlerts.length > 0) {
+                let html = '';
+                const iconAlert = getIcon('alert');
+                iconAlert.classList.add('w-6', 'h-6', 'flex-shrink-0');
+                html += iconAlert.outerHTML;
+
+                html += '<div class="flex flex-col">';
+                html += '<span class="font-bold text-lg">ALERTA DE AUDIÊNCIA (48H)!</span>';
+
+                activeAlerts.forEach((alert, index) => {
+                    html += `<p class="text-sm">Audiência <span class="font-semibold">${alert.title}</span> em <span class="font-semibold">${formatDateTime(alert.date)}</span>. Responsável: ${alert.responsible}.</p>`;
+                });
+
+                if (activeAlerts.length > 5) {
+                    html += `<p class="text-sm mt-1">Mais ${activeAlerts.length - 5} audiências em breve...</p>`;
                 }
-                setIsLoading(false);
+                html += '</div>';
+
+                alertContent.innerHTML = html;
+                alertBanner.classList.remove('hidden');
+            } else {
+                alertBanner.classList.add('hidden');
+            }
+        };
+
+        // Roda a verificação de alertas a cada minuto
+        setInterval(checkAlerts, 60000);
+
+        // --- 4. FUNÇÕES DE CRUD E FIREBASE ---
+
+        /** Lida com o envio do formulário (Adicionar/Editar). */
+        const handleFormSubmit = async (e) => {
+            e.preventDefault();
+            if (!db) return;
+
+            const formData = new FormData(hearingForm);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const hearingDate = new Date(data.date);
+                if (isNaN(hearingDate.getTime())) throw new Error("Data/hora inválida.");
+
+                const hearingData = {
+                    title: data.title,
+                    responsible: data.responsible,
+                    date: Timestamp.fromDate(hearingDate),
+                    details: data.details,
+                    status: data.status,
+                    userId: currentUserId || 'anon'
+                };
+
+                const collectionRef = collection(db, `artifacts/${appId}/public/data/hearings`);
+
+                if (data.id) {
+                    // Editar
+                    await updateDoc(doc(collectionRef, data.id), hearingData);
+                    console.log("Audiência atualizada com sucesso!");
+                } else {
+                    // Adicionar
+                    await addDoc(collectionRef, { ...hearingData, createdAt: Timestamp.now() });
+                    console.log("Audiência adicionada com sucesso!");
+                }
+                closeModal();
+            } catch (error) {
+                console.error("Erro ao salvar audiência: ", error);
+            }
+        };
+
+        /** Lida com a exclusão de uma audiência. */
+        const handleDelete = async (id) => {
+            if (!db || !id) return;
+            // Usando console.log como substituto de window.confirm
+            console.warn(`Tentativa de exclusão para o ID: ${id}. Excluindo...`);
+            try {
+                const collectionRef = collection(db, `artifacts/${appId}/public/data/hearings`);
+                await deleteDoc(doc(collectionRef, id));
+                console.log("Audiência excluída com sucesso!");
+                closeModal();
+            } catch (error) {
+                console.error("Erro ao deletar audiência: ", error);
+            }
+        };
+
+        /** Atualiza o status de uma audiência (usado pelo Kanban). */
+        const updateHearingStatus = async (id, newStatus) => {
+            if (!db) return;
+            try {
+                const collectionRef = collection(db, `artifacts/${appId}/public/data/hearings`);
+                await updateDoc(doc(collectionRef, id), { status: newStatus });
+                console.log(`Status da audiência ${id} atualizado para ${newStatus}`);
+            } catch (error) {
+                console.error("Erro ao atualizar status: ", error);
+            }
+        };
+
+        // --- 5. LÓGICA DO MODAL ---
+
+        const openModal = (hearing = null) => {
+            document.getElementById('modal-title').textContent = hearing ? 'Editar Audiência' : 'Nova Audiência';
+            hearingForm.reset();
+
+            const deleteBtn = document.getElementById('modal-delete-btn');
+            const submitBtn = document.getElementById('modal-submit-btn');
+
+            if (hearing) {
+                // Preencher para Edição
+                hearingForm.elements.title.value = hearing.title || '';
+                hearingForm.elements.responsible.value = hearing.responsible || '';
+                hearingForm.elements.details.value = hearing.details || '';
+                hearingForm.elements.status.value = hearing.status || 'Pendente';
+                hearingForm.elements.id.value = hearing.id;
+                
+                // Formato de data/hora ISO 8601 (YYYY-MM-DDTHH:MM)
+                if (hearing.date && hearing.date.seconds) {
+                    const date = new Date(hearing.date.seconds * 1000);
+                    // Formata a data e hora para o formato 'datetime-local'
+                    const dateString = date.toISOString().slice(0, 16);
+                    hearingForm.elements.date.value = dateString;
+                }
+
+                deleteBtn.classList.remove('hidden');
+                deleteBtn.onclick = () => handleDelete(hearing.id);
+                submitBtn.textContent = 'Salvar Alterações';
+            } else {
+                // Novo Registro
+                hearingForm.elements.id.value = '';
+                hearingForm.elements.responsible.value = currentUserId || 'anon'; // Preenche com o ID atual
+                hearingForm.elements.status.value = 'Pendente';
+                deleteBtn.classList.add('hidden');
+                submitBtn.textContent = 'Adicionar Audiência';
+            }
+
+            modalElement.classList.remove('hidden');
+        };
+
+        const closeModal = () => {
+            modalElement.classList.add('hidden');
+        };
+
+        // --- 6. FUNÇÕES DE RENDERIZAÇÃO DE VIEWS ---
+
+        /** Renderiza a View do Dashboard (Quadro Principal) */
+        const renderDashboard = () => {
+            const now = Date.now();
+            const upcomingHearings = hearings
+                .filter(h => h.date && (h.date.seconds * 1000) > now)
+                .sort((a, b) => a.date.seconds - b.date.seconds);
+
+            const stats = {
+                total: hearings.length,
+                pending: hearings.filter(h => h.status === 'Pendente').length,
+                completed: hearings.filter(h => h.status === 'Concluída').length,
+                upcoming: upcomingHearings.length,
             };
 
-            authenticate();
-        } else {
-            setIsLoading(false);
-        }
-    }, []);
+            const statCards = [
+                { title: "Total de Audiências", value: stats.total, color: "blue", icon: "list" },
+                { title: "Próximas (Em Breve)", value: stats.upcoming, color: "green", icon: "calendar" },
+                { title: "Status Pendente", value: stats.pending, color: "yellow", icon: "alert" },
+                { title: "Concluídas", value: stats.completed, color: "purple", icon: "dashboard" }
+            ];
 
-    // 2. Listener de Dados em Tempo Real (onSnapshot)
-    useEffect(() => {
-        if (dbInstance && userId) {
-            const collectionRef = collection(dbInstance, `artifacts/${appId}/public/data/hearings`);
+            let html = `
+                <div class="p-4 space-y-6">
+                    <!-- Cards de Estatísticas -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            `;
+            
+            statCards.forEach(card => {
+                const iconSvg = getIcon(card.icon);
+                iconSvg.classList.add('w-6', 'h-6');
+                
+                html += `
+                    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-lg border-l-4 border-${card.color}-500 transition-all hover:shadow-xl">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 p-3 rounded-full bg-${card.color}-100 dark:bg-gray-700 text-${card.color}-600 dark:text-${card.color}-400">
+                                ${iconSvg.outerHTML}
+                            </div>
+                            <div class="ml-5">
+                                <p class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">${card.title}</p>
+                                <p class="text-2xl font-bold text-gray-900 dark:text-white">${card.value}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                    
+                    <!-- Próximas Audiências -->
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Próximas 5 Audiências</h3>
+            `;
+            
+            if (upcomingHearings.length === 0) {
+                html += `<p class="text-gray-500 dark:text-gray-400">Nenhuma audiência futura agendada.</p>`;
+            } else {
+                html += `<ul class="divide-y divide-gray-200 dark:divide-gray-700">`;
+                upcomingHearings.slice(0, 5).forEach(h => {
+                    const timeRemainingMs = (h.date.seconds * 1000) - now;
+                    html += `
+                        <li data-id="${h.id}" class="py-3 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg px-2 cursor-pointer transition dashboard-hearing-item">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-lg font-medium text-gray-900 dark:text-white truncate">${h.title}</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Responsável: ${h.responsible}</p>
+                            </div>
+                            <div class="text-right ml-4">
+                                <p class="text-base font-semibold text-blue-600 dark:text-blue-400">${formatDateTime(h.date)}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">${formatTimeRemaining(timeRemainingMs)} restantes</p>
+                            </div>
+                        </li>
+                    `;
+                });
+                html += `</ul>`;
+            }
+
+            html += `
+                    </div>
+                </div>
+            `;
+            contentArea.innerHTML = html;
+
+            // Adicionar event listeners aos itens do Dashboard
+            document.querySelectorAll('.dashboard-hearing-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    const hearing = hearings.find(h => h.id === id);
+                    if (hearing) openModal(hearing);
+                });
+            });
+        };
+
+        /** Renderiza a View do Calendário (Agrupado por data) */
+        const renderCalendar = () => {
+            const now = Date.now();
+            const futureHearings = hearings
+                .filter(h => h.date && (h.date.seconds * 1000) >= now)
+                .sort((a, b) => a.date.seconds - b.date.seconds);
+
+            const groupedHearings = futureHearings.reduce((acc, h) => {
+                const date = new Date(h.date.seconds * 1000);
+                const dateKey = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+                if (!acc[dateKey]) acc[dateKey] = [];
+                acc[dateKey].push(h);
+                return acc;
+            }, {});
+
+            let html = `
+                <div class="p-4 space-y-6">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Agenda de Audiências Futuras</h2>
+            `;
+
+            if (Object.keys(groupedHearings).length === 0) {
+                html += `<p class="text-gray-500 dark:text-gray-400">O calendário está vazio. Adicione uma nova audiência!</p>`;
+            } else {
+                Object.keys(groupedHearings).forEach(dateKey => {
+                    html += `
+                        <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                            <h3 class="text-xl font-semibold text-blue-600 dark:text-blue-400 mb-3">${dateKey}</h3>
+                            <ul class="space-y-3">
+                    `;
+                    groupedHearings[dateKey].forEach(h => {
+                        const timeRemainingMs = (h.date.seconds * 1000) - now;
+                        const statusClass = h.status === 'Pendente' ? 'bg-yellow-100 text-yellow-800' : h.status === 'Em Andamento' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
+
+                        html += `
+                            <li data-id="${h.id}" class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md hover:shadow-lg transition cursor-pointer flex justify-between items-center calendar-hearing-item">
+                                <div>
+                                    <p class="font-semibold text-lg text-gray-900 dark:text-white">${h.title} (${formatTimeRemaining(timeRemainingMs)} restantes)</p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Hora: ${new Date(h.date.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} | Resp.: ${h.responsible}</p>
+                                </div>
+                                <span class="px-3 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                                    ${h.status}
+                                </span>
+                            </li>
+                        `;
+                    });
+                    html += `
+                            </ul>
+                        </div>
+                    `;
+                });
+            }
+
+            html += `</div>`;
+            contentArea.innerHTML = html;
+
+            // Adicionar event listeners aos itens do Calendário
+            document.querySelectorAll('.calendar-hearing-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    const hearing = hearings.find(h => h.id === id);
+                    if (hearing) openModal(hearing);
+                });
+            });
+        };
+
+        /** Renderiza a View do Kanban */
+        const renderKanban = () => {
+            const statuses = ['Pendente', 'Em Andamento', 'Concluída'];
+            const categorizedHearings = statuses.reduce((acc, status) => {
+                acc[status] = hearings.filter(h => h.status === status).sort((a, b) => a.date.seconds - b.date.seconds);
+                return acc;
+            }, {});
+
+            const getColumnColor = (status) => {
+                switch (status) {
+                    case 'Pendente': return 'bg-yellow-500';
+                    case 'Em Andamento': return 'bg-blue-500';
+                    case 'Concluída': return 'bg-green-500';
+                    default: return 'bg-gray-500';
+                }
+            };
+
+            let html = `
+                <div class="p-4 overflow-x-auto">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Kanban de Processos</h2>
+                    <div id="kanban-container" class="flex space-x-4">
+            `;
+
+            statuses.forEach(status => {
+                html += `
+                    <div data-status="${status}" class="kanban-column flex-shrink-0 w-80 p-4 bg-gray-100 dark:bg-gray-700 rounded-xl shadow-inner overflow-y-auto border border-gray-200 dark:border-gray-600">
+                        <h3 class="text-xl font-semibold mb-4 text-white p-2 rounded-lg ${getColumnColor(status)}">
+                            ${status} (${categorizedHearings[status]?.length || 0})
+                        </h3>
+                        <div class="space-y-3 kanban-card-list">
+                `;
+                categorizedHearings[status]?.forEach(h => {
+                    html += `
+                        <div data-id="${h.id}"
+                             draggable="true"
+                             class="kanban-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md cursor-grab transition hover:shadow-lg active:ring-4 active:ring-blue-300 dark:active:ring-blue-600"
+                        >
+                            <p class="font-bold text-gray-900 dark:text-white truncate">${h.title}</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 my-1">${formatDateTime(h.date)}</p>
+                            <p class="text-xs text-blue-600 dark:text-blue-400">Resp: ${h.responsible}</p>
+                        </div>
+                    `;
+                });
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+            contentArea.innerHTML = html;
+
+            // Adicionar Event Listeners do Kanban
+            document.querySelectorAll('.kanban-card').forEach(card => {
+                // Abrir modal ao clicar
+                card.addEventListener('click', (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    const hearing = hearings.find(h => h.id === id);
+                    if (hearing) openModal(hearing);
+                });
+                // Início do arrasto
+                card.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData("text/plain", e.currentTarget.dataset.id);
+                    e.currentTarget.classList.add('opacity-50');
+                });
+                // Fim do arrasto
+                card.addEventListener('dragend', (e) => {
+                    e.currentTarget.classList.remove('opacity-50');
+                });
+            });
+
+            document.querySelectorAll('.kanban-column').forEach(column => {
+                // Arrastando sobre a coluna
+                column.addEventListener('dragover', (e) => {
+                    e.preventDefault(); // Necessário para permitir o drop
+                    e.currentTarget.classList.add('drag-over');
+                });
+                // Saindo da coluna
+                column.addEventListener('dragleave', (e) => {
+                    e.currentTarget.classList.remove('drag-over');
+                });
+                // Soltar o cartão
+                column.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.remove('drag-over');
+
+                    const hearingId = e.dataTransfer.getData("text/plain");
+                    const newStatus = e.currentTarget.dataset.status;
+                    
+                    if (hearingId && newStatus) {
+                        updateHearingStatus(hearingId, newStatus);
+                    }
+                });
+            });
+        };
+
+        // --- 7. FUNÇÃO DE RENDERIZAÇÃO PRINCIPAL E SETUP DA UI ---
+
+        /** Atualiza a renderização da view atual com os dados mais recentes. */
+        const updateUI = () => {
+            document.getElementById('loading-spinner')?.remove();
+            
+            // Renderiza a view correta
+            if (currentView === 'dashboard') renderDashboard();
+            else if (currentView === 'calendar') renderCalendar();
+            else if (currentView === 'kanban') renderKanban();
+
+            checkAlerts();
+        };
+
+        // --- 8. AUTENTICAÇÃO E LISTENERS DE DADOS ---
+
+        // Configurar a view inicial
+        const switchView = (view) => {
+            currentView = view;
+            navLinks.forEach(link => {
+                const isActive = link.dataset.view === view;
+                link.classList.toggle('border-b-4', isActive);
+                link.classList.toggle('border-blue-600', isActive);
+                link.classList.toggle('text-blue-600', isActive);
+                link.classList.toggle('dark:text-blue-400', isActive);
+                link.classList.toggle('dark:border-blue-400', isActive);
+
+                link.classList.toggle('text-gray-500', !isActive);
+                link.classList.toggle('hover:text-gray-700', !isActive);
+                link.classList.toggle('dark:text-gray-400', !isActive);
+                link.classList.toggle('dark:hover:text-gray-200', !isActive);
+            });
+            updateUI(); // Renderiza a nova view
+        };
+
+        // 8.1 Autenticação e Configuração
+        const setupApp = async () => {
+            try {
+                if (initialAuthToken) {
+                    const userCredential = await signInWithCustomToken(auth, initialAuthToken);
+                    currentUserId = userCredential.user.uid;
+                } else {
+                    const userCredential = await signInAnonymously(auth);
+                    currentUserId = userCredential.user.uid;
+                }
+            } catch (error) {
+                console.error("Erro na autenticação:", error);
+                currentUserId = crypto.randomUUID(); // Fallback
+            }
+
+            // 8.2 Listener de Dados
+            const collectionRef = collection(db, `artifacts/${appId}/public/data/hearings`);
             const q = query(collectionRef);
 
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                const fetchedHearings = snapshot.docs.map(doc => ({
+            onSnapshot(q, (snapshot) => {
+                hearings = snapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
                 }));
-                setHearings(fetchedHearings);
-                setShowBanner(true); // Mostrar banner novamente quando os dados atualizarem
+                updateUI();
             }, (error) => {
                 console.error("Erro ao receber dados em tempo real:", error);
             });
+        };
 
-            return () => unsubscribe();
-        }
-    }, [dbInstance, userId]);
-
-
-    // 3. Lógica de Alerta de 48 Horas
-    const checkAlerts = useCallback((currentHearings) => {
-        const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000;
-        const now = Date.now();
-
-        const activeAlerts = currentHearings.filter(hearing => {
-            if (!hearing.date || !hearing.date.seconds) return false;
-            
-            const hearingTime = hearing.date.seconds * 1000;
-            const timeDifference = hearingTime - now;
-
-            // Alerta deve ser exibido se:
-            // 1. Ainda está no futuro (timeDifference > 0)
-            // 2. E a diferença de tempo é menor ou igual a 48 horas
-            return timeDifference > 0 && timeDifference <= FORTY_EIGHT_HOURS;
+        // 8.3 Event Listeners UI
+        navLinks.forEach(link => {
+            link.addEventListener('click', () => switchView(link.dataset.view));
         });
 
-        setAlerts(activeAlerts.sort((a, b) => a.date.seconds - b.date.seconds));
-    }, []);
+        document.getElementById('new-hearing-btn').addEventListener('click', () => openModal(null));
+        hearingForm.addEventListener('submit', handleFormSubmit);
 
-    // Rodar a verificação de alertas a cada minuto e sempre que os hearings mudam
-    useEffect(() => {
-        checkAlerts(hearings);
+        // Inicia a aplicação no carregamento da janela
+        window.onload = setupApp;
 
-        const intervalId = setInterval(() => {
-            checkAlerts(hearings);
-        }, 60000); // Checa a cada 60 segundos (1 minuto)
-
-        return () => clearInterval(intervalId);
-    }, [hearings, checkAlerts]);
-
-
-    // 4. Função para atualizar status do Kanban
-    const updateHearingStatus = useCallback(async (id, newStatus) => {
-        if (!dbInstance) return;
-        try {
-            const collectionRef = collection(dbInstance, `artifacts/${appId}/public/data/hearings`);
-            await updateDoc(doc(collectionRef, id), { status: newStatus });
-            console.log(`Status da audiência ${id} atualizado para ${newStatus}`);
-        } catch (error) {
-            console.error("Erro ao atualizar status: ", error);
-        }
-    }, [dbInstance]);
-
-
-    if (isLoading) {
-        return <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-gray-900 text-lg text-gray-700 dark:text-gray-300">Carregando aplicação...</div>;
-    }
-
-    const renderView = () => {
-        if (!dbInstance || !userId) {
-             return <div className="p-8 text-center text-red-500 bg-red-100 rounded-xl m-4">Erro: Falha na conexão com o Banco de Dados.</div>;
-        }
-        
-        switch (view) {
-            case 'calendar':
-                return <CalendarView hearings={hearings} setModalHearing={setModalHearing} />;
-            case 'kanban':
-                return <KanbanView hearings={hearings} setModalHearing={setModalHearing} updateHearingStatus={updateHearingStatus} />;
-            case 'dashboard':
-            default:
-                return <DashboardView hearings={hearings} setModalHearing={setModalHearing} auth={authInstance} />;
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans text-gray-800 dark:text-gray-200">
-            
-            {/* Banner de Alerta (Sempre no topo) */}
-            {showBanner && <AlertBanner alerts={alerts} onClose={() => setShowBanner(false)} />}
-            
-            <header className="bg-white dark:bg-gray-800 shadow-lg sticky top-0 z-40">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-                    <h1 className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">
-                        Gestão Jurídica
-                    </h1>
-                    <button
-                        onClick={() => setModalHearing({})} // Passar objeto vazio para "Nova Audiência"
-                        className="flex items-center space-x-2 py-2 px-4 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-full shadow-md transition duration-200"
-                    >
-                        <PlusIcon className="w-5 h-5" />
-                        <span>Nova Audiência</span>
-                    </button>
-                </div>
-            </header>
-
-            <nav className="bg-white dark:bg-gray-800 shadow-md">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex space-x-4">
-                        <NavLink view="dashboard" currentView={view} setView={setView} icon={LayoutDashboardIcon}>Quadro Principal</NavLink>
-                        <NavLink view="calendar" currentView={view} setView={setView} icon={CalendarIcon}>Calendário</NavLink>
-                        <NavLink view="kanban" currentView={view} setView={setView} icon={ListOrderedIcon}>Kanban</NavLink>
-                    </div>
-                </div>
-            </nav>
-
-            <main className="max-w-7xl mx-auto pb-12">
-                {renderView()}
-            </main>
-
-            {/* Modal */}
-            {modalHearing && (
-                <HearingModal
-                    hearing={modalHearing.id ? modalHearing : null}
-                    onClose={() => setModalHearing(null)}
-                    db={dbInstance}
-                    userId={userId}
-                />
-            )}
-        </div>
-    );
-};
-
-const NavLink = ({ view, currentView, setView, icon: Icon, children }) => {
-    const isActive = view === currentView;
-    return (
-        <button
-            onClick={() => setView(view)}
-            className={`flex items-center space-x-2 py-3 px-3 text-sm font-medium rounded-t-lg transition duration-150 ease-in-out ${
-                isActive
-                    ? 'border-b-4 border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
-        >
-            <Icon className="w-5 h-5" />
-            <span>{children}</span>
-        </button>
-    );
-};
-
-// Exporta o componente App como default
-export default App;
+    </script>
+</body>
+</html>
