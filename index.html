@@ -110,18 +110,68 @@
                 <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"><svg class="w-6 h-6"><use href="#icon-x"></use></svg></button>
             </div>
             <form id="hearing-form" class="space-y-4">
+                <!-- TÍTULO/ASSUNTO -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Título/Assunto</label>
                     <input type="text" name="title" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Ex: Audiência de Conciliação" />
                 </div>
+                
+                <!-- RECLAMANTE -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Responsável (Quem está Cuidando)</label>
-                    <input type="text" name="responsible" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome ou ID do Advogado" />
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Reclamante</label>
+                    <input type="text" name="reclamante" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome do Reclamante" />
                 </div>
+
+                <!-- RECLAMADA -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data e Hora</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Reclamada</label>
+                    <input type="text" name="reclamada" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome da Reclamada" />
+                </div>
+
+                <!-- RESPONSÁVEL (Quem está Cuidando) -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Responsável (Advogado/Paralegal)</label>
+                    <input type="text" name="responsible" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome do Responsável" />
+                </div>
+                
+                <!-- DATA E HORA -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data e Horário</label>
                     <input type="datetime-local" name="date" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" />
                 </div>
+
+                <!-- TIPO DE AUDIÊNCIA e MODALIDADE (Lado a Lado em Mobile) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- TIPO DE AUDIÊNCIA -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de Audiência</label>
+                        <select name="hearingType" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500">
+                            <option value="Conciliação">Conciliação</option>
+                            <option value="Instrução">Instrução</option>
+                            <option value="Una">Una</option>
+                            <option value="Julgamento">Julgamento</option>
+                            <option value="Outro">Outro</option>
+                        </select>
+                    </div>
+                    
+                    <!-- MODALIDADE -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Modalidade</label>
+                        <select name="modality" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500">
+                            <option value="Presencial">Presencial</option>
+                            <option value="Virtual">Virtual</option>
+                            <option value="Híbrida">Híbrida</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- PREPOSTO -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Preposto</label>
+                    <input type="text" name="preposto" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome do Preposto (se houver)" />
+                </div>
+
+                <!-- STATUS (KANBAN) -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status (Kanban)</label>
                     <select name="status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500">
@@ -130,10 +180,13 @@
                         <option value="Concluída">Concluída</option>
                     </select>
                 </div>
+                
+                <!-- DETALHES/PROCESSO -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Detalhes/Processo</label>
-                    <textarea name="details" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Número do Processo, Vara, etc."></textarea>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Detalhes Adicionais (Nº Processo, Vara, Link Virtual)</label>
+                    <textarea name="details" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nº do Processo, Vara, Link da Sala Virtual, etc."></textarea>
                 </div>
+
                 <input type="hidden" name="id" />
                 <button type="submit" id="modal-submit-btn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition duration-200">
                     Salvar
@@ -279,8 +332,13 @@
 
                 const hearingData = {
                     title: data.title,
+                    reclamante: data.reclamante, // NOVO
+                    reclamada: data.reclamada,   // NOVO
                     responsible: data.responsible,
                     date: Timestamp.fromDate(hearingDate),
+                    hearingType: data.hearingType, // NOVO
+                    modality: data.modality,     // NOVO
+                    preposto: data.preposto,     // NOVO
                     details: data.details,
                     status: data.status,
                     userId: currentUserId || 'anon'
@@ -342,7 +400,12 @@
             if (hearing) {
                 // Preencher para Edição
                 hearingForm.elements.title.value = hearing.title || '';
+                hearingForm.elements.reclamante.value = hearing.reclamante || ''; // NOVO
+                hearingForm.elements.reclamada.value = hearing.reclamada || '';   // NOVO
                 hearingForm.elements.responsible.value = hearing.responsible || '';
+                hearingForm.elements.hearingType.value = hearing.hearingType || 'Conciliação'; // NOVO
+                hearingForm.elements.modality.value = hearing.modality || 'Presencial';     // NOVO
+                hearingForm.elements.preposto.value = hearing.preposto || '';     // NOVO
                 hearingForm.elements.details.value = hearing.details || '';
                 hearingForm.elements.status.value = hearing.status || 'Pendente';
                 hearingForm.elements.id.value = hearing.id;
@@ -439,8 +502,8 @@
                     html += `
                         <li data-id="${h.id}" class="py-3 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg px-2 cursor-pointer transition dashboard-hearing-item">
                             <div class="flex-1 min-w-0">
-                                <p class="text-lg font-medium text-gray-900 dark:text-white truncate">${h.title}</p>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">Responsável: ${h.responsible}</p>
+                                <p class="text-lg font-medium text-gray-900 dark:text-white truncate">${h.title} (${h.reclamante} vs ${h.reclamada})</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Tipo: ${h.hearingType} (${h.modality}) | Resp: ${h.responsible}</p>
                             </div>
                             <div class="text-right ml-4">
                                 <p class="text-base font-semibold text-blue-600 dark:text-blue-400">${formatDateTime(h.date)}</p>
@@ -504,10 +567,13 @@
                         html += `
                             <li data-id="${h.id}" class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md hover:shadow-lg transition cursor-pointer flex justify-between items-center calendar-hearing-item">
                                 <div>
-                                    <p class="font-semibold text-lg text-gray-900 dark:text-white">${h.title} (${formatTimeRemaining(timeRemainingMs)} restantes)</p>
-                                    <p class="text-sm text-gray-500 dark:text-gray-400">Hora: ${new Date(h.date.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} | Resp.: ${h.responsible}</p>
+                                    <p class="font-semibold text-lg text-gray-900 dark:text-white">${h.reclamante} vs ${h.reclamada}</p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 my-1">
+                                        <span class="font-medium">${h.hearingType} (${h.modality})</span> | Hora: ${new Date(h.date.seconds * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                    <p class="text-xs text-blue-600 dark:text-blue-400">Resp: ${h.responsible} | Faltam: ${formatTimeRemaining(timeRemainingMs)}</p>
                                 </div>
-                                <span class="px-3 py-1 text-xs font-semibold rounded-full ${statusClass}">
+                                <span class="px-3 py-1 text-xs font-semibold rounded-full ${statusClass} flex-shrink-0 ml-4">
                                     ${h.status}
                                 </span>
                             </li>
@@ -570,9 +636,9 @@
                              draggable="true"
                              class="kanban-card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md cursor-grab transition hover:shadow-lg active:ring-4 active:ring-blue-300 dark:active:ring-blue-600"
                         >
-                            <p class="font-bold text-gray-900 dark:text-white truncate">${h.title}</p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 my-1">${formatDateTime(h.date)}</p>
-                            <p class="text-xs text-blue-600 dark:text-blue-400">Resp: ${h.responsible}</p>
+                            <p class="font-bold text-gray-900 dark:text-white truncate">${h.reclamante} vs ${h.reclamada}</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 my-1">${formatDateTime(h.date)} - ${h.hearingType} (${h.modality})</p>
+                            <p class="text-xs text-blue-600 dark:text-blue-400">Resp: ${h.responsible} | Preposto: ${h.preposto || 'N/A'}</p>
                         </div>
                     `;
                 });
