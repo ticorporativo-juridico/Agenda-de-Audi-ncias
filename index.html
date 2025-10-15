@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agenda de Audiências - Kanban View</title>
+    <title>Agenda de Audiências - Kanban Local</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Configuração do Google Font (Inter) -->
@@ -80,103 +80,48 @@
             100% { transform: rotate(360deg); }
         }
     </style>
-    <!-- Firebase Imports -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, addDoc, setDoc, deleteDoc, onSnapshot, collection, query, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Variáveis globais obrigatórias
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        let db;
-        let auth;
-        let userId = 'anonimo';
-        let isAuthReady = false;
+    <script>
+        // Variável local para armazenar os dados e o ID da chave no localStorage
+        const STORAGE_KEY = 'kanbanJuridicoAudiencias';
         let globalMeetings = [];
 
-        // Função utilitária para retentar chamadas da API com backoff
-        const withRetry = async (fn, maxRetries = 5, delay = 1000) => {
-            for (let i = 0; i < maxRetries; i++) {
-                try {
-                    return await fn();
-                } catch (error) {
-                    if (i === maxRetries - 1) throw error;
-                    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
-                }
-            }
-        };
-
-        const initFirebase = async () => {
+        // --- Funções de Persistência Local (localStorage) ---
+        
+        // 1. Carrega as audiências do localStorage
+        const loadHearings = () => {
             try {
-                setLogLevel('Debug');
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}...`;
-                    } else {
-                        document.getElementById('user-id-display').textContent = `Usuário ID: ${userId} (Anônimo)`;
-                    }
-                    isAuthReady = true;
-                    setupRealtimeListener();
-                });
-
+                const storedData = localStorage.getItem(STORAGE_KEY);
+                return storedData ? JSON.parse(storedData) : [];
             } catch (error) {
-                console.error("Erro ao inicializar Firebase ou autenticar:", error);
-                document.getElementById('kanban-board').innerHTML = `<p class="text-red-600 p-4">Erro ao carregar o aplicativo. Verifique o console para detalhes.</p>`;
+                console.error("Erro ao carregar dados do localStorage:", error);
+                return [];
             }
         };
 
-        const DB_PATH = (collectionName) => `artifacts/${appId}/public/data/${collectionName}`;
-
-        const setupRealtimeListener = () => {
-            if (!isAuthReady || !db) return;
-
-            const meetingsRef = collection(db, DB_PATH('hearings'));
-            const q = query(meetingsRef);
-
-            onSnapshot(q, (snapshot) => {
-                const meetings = [];
-                snapshot.forEach(doc => {
-                    meetings.push({ id: doc.id, ...doc.data() });
-                });
-                
-                // Ordenar por Data/Hora para garantir ordem dentro das colunas
-                meetings.sort((a, b) => {
-                    const dateA = new Date(`${a.date}T${a.time}`);
-                    const dateB = new Date(`${b.date}T${b.time}`);
-                    return dateA.getTime() - dateB.getTime();
-                });
-                
-                globalMeetings = meetings;
-                renderHearings(meetings);
-            }, (error) => {
-                console.error("Erro ao ouvir a coleção de audiências:", error);
-                document.getElementById('kanban-board').innerHTML = `<p class="text-red-600 p-4">Erro de conexão em tempo real. Tente recarregar.</p>`;
-            });
+        // 2. Salva as audiências no localStorage
+        const saveHearings = (meetings) => {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(meetings));
+            } catch (error) {
+                console.error("Erro ao salvar dados no localStorage:", error);
+            }
         };
 
-        // Status das colunas no Kanban, com cores de cabeçalho
+        // 3. Gera um ID único simples (substituindo o ID do Firestore)
+        const generateId = () => {
+            return Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+        };
+
+        // --- Configurações do Kanban ---
+        
         const STATUS_COLUMNS = [
-            { key: 'Em Preparação', title: 'Em Preparação', color: '#f97316' }, // Laranja Forte
-            { key: 'Agendada', title: 'Agendada', color: '#3b82f6' }, // Azul Forte
-            { key: 'Atrasada', title: 'Atrasada', color: '#ef4444' }, // Vermelho Forte
-            { key: 'Realizada', title: 'Realizada', color: '#10b981' }, // Verde Forte
+            { key: 'Em Preparação', title: 'Em Preparação', color: '#f97316' },
+            { key: 'Agendada', title: 'Agendada', color: '#3b82f6' },
+            { key: 'Atrasada', title: 'Atrasada', color: '#ef4444' },
+            { key: 'Realizada', title: 'Realizada', color: '#10b981' },
         ];
 
-        // Mapeamento de classes CSS para Tipos
         const getTypeClass = (type) => {
             switch (type) {
                 case 'Inicial': return 'tipo-inicial';
@@ -187,6 +132,24 @@
             }
         };
         
+        // Função para mostrar/esconder o campo de histórico, dependendo do status
+        const toggleHistoryField = () => {
+            const status = document.getElementById('status').value;
+            const historyField = document.getElementById('historico-field');
+            const historicoTextarea = document.getElementById('historico');
+
+            if (status === 'Realizada') {
+                historyField.classList.remove('hidden');
+                // Torna o campo obrigatório quando o status é 'Realizada'
+                historicoTextarea.setAttribute('required', 'required');
+            } else {
+                historyField.classList.add('hidden');
+                historicoTextarea.removeAttribute('required');
+            }
+        };
+
+        // --- Renderização e Lógica ---
+        
         const renderHearings = (meetings) => {
             const container = document.getElementById('kanban-board');
             container.innerHTML = '';
@@ -196,7 +159,7 @@
                 return;
             }
 
-            // 1. Agrupar reuniões por status
+            // 1. Agrupar audiências por status
             const groupedMeetings = meetings.reduce((acc, meeting) => {
                 const status = meeting.status || 'Agendada';
                 if (!acc[status]) acc[status] = [];
@@ -209,6 +172,13 @@
 
             STATUS_COLUMNS.forEach(column => {
                 const meetingsInColumn = groupedMeetings[column.key] || [];
+                
+                // Ordenar por Data/Hora dentro da coluna
+                meetingsInColumn.sort((a, b) => {
+                    const dateA = new Date(`${a.date}T${a.time}`);
+                    const dateB = new Date(`${b.date}T${b.time}`);
+                    return dateA.getTime() - dateB.getTime();
+                });
                 
                 let cardsHtml = '';
                 meetingsInColumn.forEach(meeting => {
@@ -239,7 +209,16 @@
                             
                             <!-- Tags e Ações -->
                             <div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
-                                <span class="tag-small ${tipoClass}" title="Tipo de Audiência">${meeting.tipo}</span>
+                                <div class="flex items-center space-x-2">
+                                    <span class="tag-small ${tipoClass}" title="Tipo de Audiência">${meeting.tipo}</span>
+                                    <!-- Indicador de Histórico/Pauta Preenchida -->
+                                    ${meeting.historico && meeting.status === 'Realizada' ? 
+                                        `<span class="tag-small bg-green-100 text-green-700 flex items-center" title="Concluída com Pauta Registrada">
+                                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                                            Pauta
+                                        </span>` 
+                                        : ''}
+                                </div>
                                 <button onclick="event.stopPropagation(); handleDelete('${meeting.id}')" class="text-red-400 hover:text-red-600 p-1 transition duration-150" title="Excluir Audiência">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 </button>
@@ -261,6 +240,11 @@
             });
 
             container.innerHTML = `<div class="kanban-container p-4">${kanbanHtml}</div>`;
+        };
+
+        const loadAndRender = () => {
+            globalMeetings = loadHearings();
+            renderHearings(globalMeetings);
         };
 
         // Função para preencher o modal com dados para edição
@@ -285,6 +269,12 @@
             document.getElementById('preposto').value = meeting.preposto || '';
             document.getElementById('responsavel').value = meeting.responsavel || '';
             document.getElementById('status').value = meeting.status || 'Agendada';
+            
+            // Novo Campo: Histórico
+            document.getElementById('historico').value = meeting.historico || ''; 
+
+            // Garante que o campo de histórico seja exibido/ocultado corretamente
+            toggleHistoryField(); 
 
             window.openModal(id);
         };
@@ -296,7 +286,10 @@
                 document.getElementById('audiencia-id').value = '';
                 document.getElementById('modal-title').textContent = 'Cadastrar Nova Audiência';
                 document.getElementById('status').value = 'Agendada';
+                document.getElementById('historico').value = ''; // Limpa o histórico
             }
+            // Garante o estado inicial correto da visibilidade do histórico
+            toggleHistoryField();
             document.getElementById('add-hearing-modal').classList.remove('hidden');
         };
 
@@ -305,7 +298,7 @@
             document.getElementById('add-hearing-modal').classList.add('hidden');
         };
 
-        // Função para lidar com o envio do formulário
+        // Função para lidar com o envio do formulário (usa localStorage)
         window.handleFormSubmit = async (event) => {
             event.preventDefault();
 
@@ -313,6 +306,8 @@
             const id = form.elements['audiencia-id'].value;
             const submitButton = document.getElementById('submit-button');
             const originalButtonContent = submitButton.innerHTML;
+            
+            const historicoValue = form.elements['historico'].value.trim();
 
             const hearingData = {
                 date: form.elements['date'].value,
@@ -325,58 +320,69 @@
                 preposto: form.elements['preposto'].value.trim(),
                 responsavel: form.elements['responsavel'].value.trim(),
                 status: form.elements['status'].value,
+                historico: historicoValue // Novo campo
             };
 
-            // Validação simples
+            // Validação simples dos campos obrigatórios iniciais
             if (!hearingData.date || !hearingData.time || !hearingData.reclamante || !hearingData.reclamada || !hearingData.tipo || !hearingData.modalidade || !hearingData.responsavel) {
-                // Substitua alert() por uma mensagem de erro na UI em produção
-                alert('Por favor, preencha todos os campos obrigatórios.');
+                console.error('Por favor, preencha todos os campos obrigatórios.');
+                return;
+            }
+            
+            // Validação extra: Se o status for Realizada, o histórico é obrigatório
+            if (hearingData.status === 'Realizada' && !hearingData.historico) {
+                console.error('Para audiências realizadas, o campo de Conclusão/Pauta é obrigatório.');
                 return;
             }
 
-            // Inicia o estado de loading no botão
+            // Inicia o estado de loading no botão (Apenas visualmente, pois é local)
             submitButton.disabled = true;
             submitButton.innerHTML = `<div class="loader mr-2"></div> Salvando...`;
 
-            const meetingsRef = collection(db, DB_PATH('hearings'));
-
-            try {
-                if (id) {
-                    await withRetry(() => setDoc(doc(db, DB_PATH('hearings'), id), hearingData, { merge: true }));
+            if (id) {
+                // Atualizar
+                const index = globalMeetings.findIndex(m => m.id === id);
+                if (index !== -1) {
+                    globalMeetings[index] = { ...globalMeetings[index], ...hearingData };
                     console.log("Audiência atualizada com ID:", id);
-                } else {
-                    hearingData.createdAt = serverTimestamp();
-                    hearingData.createdBy = userId;
-                    await withRetry(() => addDoc(meetingsRef, hearingData));
-                    console.log("Nova audiência adicionada.");
                 }
+            } else {
+                // Adicionar nova audiência
+                hearingData.id = generateId();
+                globalMeetings.push(hearingData);
+                console.log("Nova audiência adicionada.");
+            }
 
+            // Simulação de espera para dar tempo de ver o loading
+            setTimeout(() => {
+                saveHearings(globalMeetings);
+                loadAndRender(); // Recarrega a visualização
                 closeModal();
-            } catch (e) {
-                console.error("Erro ao adicionar/atualizar audiência: ", e);
-                alert('ERRO: Não foi possível salvar a audiência. Verifique sua conexão e tente novamente.'); 
-            } finally {
+                
                 // Restaura o botão
                 submitButton.disabled = false;
                 submitButton.innerHTML = originalButtonContent;
-            }
+            }, 500); // 500ms de espera
+
         };
 
-        // Função para deletar uma audiência
-        window.handleDelete = async (id) => {
-            if (!confirm(`Tem certeza que deseja excluir esta audiência?`)) return;
+        // Função para deletar uma audiência (usa localStorage)
+        window.handleDelete = (id) => {
+            // Usamos window.confirm para o feedback de exclusão
+            if (!window.confirm(`Tem certeza que deseja excluir esta audiência?`)) return;
 
-            try {
-                await withRetry(() => deleteDoc(doc(db, DB_PATH('hearings'), id)));
-                console.log("Audiência deletada com ID:", id);
-            } catch (e) {
-                console.error("Erro ao deletar audiência: ", e);
-                alert('Erro ao deletar do banco de dados. Tente novamente.');
-            }
+            globalMeetings = globalMeetings.filter(m => m.id !== id);
+            saveHearings(globalMeetings);
+            loadAndRender();
+            console.log("Audiência deletada com ID:", id);
         };
 
-        // Inicializa o Firebase
-        document.addEventListener('DOMContentLoaded', initFirebase);
+        // Inicializa a aplicação ao carregar o documento
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAndRender();
+            // Adiciona listener para controlar a visibilidade do campo de histórico
+            document.getElementById('status').addEventListener('change', toggleHistoryField);
+        });
     </script>
 </head>
 <body class="min-h-screen p-4 md:p-8">
@@ -385,7 +391,6 @@
     <header class="flex flex-col md:flex-row justify-between items-center mb-8 p-4 bg-white rounded-xl shadow-lg board-card">
         <h1 class="text-3xl font-extrabold text-indigo-700">🗓️ Gestão de Audiências - Kanban</h1>
         <div class="flex items-center space-x-4 mt-4 md:mt-0">
-            <span id="user-id-display" class="text-xs text-gray-500 bg-gray-100 p-2 rounded-lg truncate">Usuário ID: anonimo</span>
             <button onclick="openModal()" class="flex items-center bg-indigo-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-indigo-700 transition duration-200 shadow-md hover:shadow-lg">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                 Nova Audiência
@@ -481,6 +486,12 @@
                             <option value="Atrasada">Atrasada</option>
                         </select>
                     </div>
+                </div>
+                
+                <!-- Novo Campo: Histórico/Pauta/Conclusão (Visibilidade controlada por JS) -->
+                <div id="historico-field" class="mb-4 hidden">
+                    <label for="historico" class="block text-sm font-medium text-gray-700 mb-1">Conclusão / Pauta Resumida (Obrigatório se Status for "Realizada")</label>
+                    <textarea id="historico" name="historico" rows="4" placeholder="Descreva o que foi pautado e a conclusão da audiência." class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></textarea>
                 </div>
                 
                 <div class="flex justify-end space-x-3">
