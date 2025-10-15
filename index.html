@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda de Audiências - Kanban View</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configuração do Google Font (Inter) -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f6f9; 
+        }
+        .board-card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        }
+        .kanban-container {
+            /* Permite o scroll horizontal e garante que as colunas fiquem lado a lado */
+            display: flex;
+            overflow-x: auto;
+            min-height: calc(100vh - 12rem); /* Altura mínima para o scroll funcionar bem */
+        }
+        .kanban-column {
+            min-width: 300px;
+            width: 300px;
+            margin-right: 16px;
+            border-radius: 0.5rem;
+            flex-shrink: 0;
+            background-color: #ffffff; /* Fundo branco das colunas */
+        }
+        .kanban-header {
+            padding: 12px 16px;
+            font-weight: 700;
+            color: white;
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+            font-size: 1.1rem;
+        }
+        .kanban-card {
+            background-color: #ffffff;
+            border-radius: 0.5rem;
+            padding: 12px;
+            margin: 8px 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid #e5e7eb;
+        }
+        .kanban-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        .tag-small {
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.7rem;
+            white-space: nowrap;
+        }
+        
+        /* Estilos de Cores para Tipos */
+        .tipo-inicial { background-color: #fca5a5; color: #7f1d1d; } 
+        .tipo-instrucao { background-color: #fde68a; color: #78350f; }
+        .tipo-conciliacao { background-color: #a7f3d0; color: #065f46; }
+        .tipo-una { background-color: #bfdbfe; color: #1e40af; }
+        .tipo-outros { background-color: #e2e8f0; color: #475569; }
+
+        /* Spinner CSS simples */
+        .loader {
+            border-top: 3px solid #fff;
+            border-right: 3px solid transparent;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, addDoc, setDoc, deleteDoc, onSnapshot, collection, query, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Variáveis globais obrigatórias
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db;
+        let auth;
+        let userId = 'anonimo';
+        let isAuthReady = false;
+        let globalMeetings = [];
+
+        // Função utilitária para retentar chamadas da API com backoff
+        const withRetry = async (fn, maxRetries = 5, delay = 1000) => {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    return await fn();
+                } catch (error) {
+                    if (i === maxRetries - 1) throw error;
+                    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+                }
+            }
+        };
+
+        const initFirebase = async () => {
+            try {
+                setLogLevel('Debug');
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        document.getElementById('user-id-display').textContent = `Usuário ID: ${userId.substring(0, 8)}...`;
+                    } else {
+                        document.getElementById('user-id-display').textContent = `Usuário ID: ${userId} (Anônimo)`;
+                    }
+                    isAuthReady = true;
+                    setupRealtimeListener();
+                });
+
+            } catch (error) {
+                console.error("Erro ao inicializar Firebase ou autenticar:", error);
+                document.getElementById('kanban-board').innerHTML = `<p class="text-red-600 p-4">Erro ao carregar o aplicativo. Verifique o console para detalhes.</p>`;
+            }
+        };
+
+        const DB_PATH = (collectionName) => `artifacts/${appId}/public/data/${collectionName}`;
+
+        const setupRealtimeListener = () => {
+            if (!isAuthReady || !db) return;
+
+            const meetingsRef = collection(db, DB_PATH('hearings'));
+            const q = query(meetingsRef);
+
+            onSnapshot(q, (snapshot) => {
+                const meetings = [];
+                snapshot.forEach(doc => {
+                    meetings.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // Ordenar por Data/Hora para garantir ordem dentro das colunas
+                meetings.sort((a, b) => {
+                    const dateA = new Date(`${a.date}T${a.time}`);
+                    const dateB = new Date(`${b.date}T${b.time}`);
+                    return dateA.getTime() - dateB.getTime();
+                });
+                
+                globalMeetings = meetings;
+                renderHearings(meetings);
+            }, (error) => {
+                console.error("Erro ao ouvir a coleção de audiências:", error);
+                document.getElementById('kanban-board').innerHTML = `<p class="text-red-600 p-4">Erro de conexão em tempo real. Tente recarregar.</p>`;
+            });
+        };
+
+        // Status das colunas no Kanban, com cores de cabeçalho
+        const STATUS_COLUMNS = [
+            { key: 'Em Preparação', title: 'Em Preparação', color: '#f97316' }, // Laranja Forte
+            { key: 'Agendada', title: 'Agendada', color: '#3b82f6' }, // Azul Forte
+            { key: 'Atrasada', title: 'Atrasada', color: '#ef4444' }, // Vermelho Forte
+            { key: 'Realizada', title: 'Realizada', color: '#10b981' }, // Verde Forte
+        ];
+
+        // Mapeamento de classes CSS para Tipos
+        const getTypeClass = (type) => {
+            switch (type) {
+                case 'Inicial': return 'tipo-inicial';
+                case 'Instrução': return 'tipo-instrucao';
+                case 'Conciliação': return 'tipo-conciliacao';
+                case 'Una': return 'tipo-una';
+                default: return 'tipo-outros';
+            }
+        };
+        
+        const renderHearings = (meetings) => {
+            const container = document.getElementById('kanban-board');
+            container.innerHTML = '';
+            
+            if (meetings.length === 0) {
+                container.innerHTML = `<div class="p-6 text-center text-gray-500">Nenhuma audiência cadastrada. Clique em "Nova Audiência" para começar!</div>`;
+                return;
+            }
+
+            // 1. Agrupar reuniões por status
+            const groupedMeetings = meetings.reduce((acc, meeting) => {
+                const status = meeting.status || 'Agendada';
+                if (!acc[status]) acc[status] = [];
+                acc[status].push(meeting);
+                return acc;
+            }, {});
+
+            // 2. Renderizar as colunas Kanban
+            let kanbanHtml = '';
+
+            STATUS_COLUMNS.forEach(column => {
+                const meetingsInColumn = groupedMeetings[column.key] || [];
+                
+                let cardsHtml = '';
+                meetingsInColumn.forEach(meeting => {
+                    const tipoClass = getTypeClass(meeting.tipo);
+                    
+                    cardsHtml += `
+                        <div class="kanban-card" onclick="handleEdit('${meeting.id}')" title="Clique para Editar">
+                            <!-- Título do Card: Reclamante vs Reclamada -->
+                            <h4 class="font-bold text-gray-900 mb-2">${meeting.reclamante} vs. ${meeting.reclamada}</h4>
+                            
+                            <div class="space-y-1 text-sm text-gray-600">
+                                <!-- Processo -->
+                                <p class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                                    ${meeting.processo || 'S/ Processo'}
+                                </p>
+                                <!-- Responsável -->
+                                <p class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                                    ${meeting.responsavel || 'N/A'}
+                                </p>
+                                <!-- Data e Hora -->
+                                <p class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                    ${meeting.date ? meeting.date.split('-').reverse().join('/') : 'S/ Data'} ${meeting.time || ''}
+                                </p>
+                            </div>
+                            
+                            <!-- Tags e Ações -->
+                            <div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
+                                <span class="tag-small ${tipoClass}" title="Tipo de Audiência">${meeting.tipo}</span>
+                                <button onclick="event.stopPropagation(); handleDelete('${meeting.id}')" class="text-red-400 hover:text-red-600 p-1 transition duration-150" title="Excluir Audiência">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                kanbanHtml += `
+                    <div class="kanban-column">
+                        <div class="kanban-header" style="background-color: ${column.color};">
+                            ${column.title} (${meetingsInColumn.length})
+                        </div>
+                        <div class="kanban-body p-2 space-y-3 min-h-20">
+                            ${cardsHtml || '<p class="text-center text-gray-400 text-sm p-4">Nenhuma audiência neste status.</p>'}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = `<div class="kanban-container p-4">${kanbanHtml}</div>`;
+        };
+
+        // Função para preencher o modal com dados para edição
+        window.handleEdit = (id) => {
+            const meeting = globalMeetings.find(m => m.id === id);
+            if (!meeting) {
+                console.error('Audiência não encontrada.');
+                return;
+            }
+
+            document.getElementById('modal-title').textContent = 'Editar Audiência';
+            document.getElementById('audiencia-id').value = id;
+            
+            // Preenche os campos do formulário
+            document.getElementById('date').value = meeting.date || '';
+            document.getElementById('time').value = meeting.time || '';
+            document.getElementById('reclamante').value = meeting.reclamante || '';
+            document.getElementById('reclamada').value = meeting.reclamada || '';
+            document.getElementById('processo').value = meeting.processo || '';
+            document.getElementById('tipo').value = meeting.tipo || '';
+            document.getElementById('modalidade').value = meeting.modalidade || '';
+            document.getElementById('preposto').value = meeting.preposto || '';
+            document.getElementById('responsavel').value = meeting.responsavel || '';
+            document.getElementById('status').value = meeting.status || 'Agendada';
+
+            window.openModal(id);
+        };
+        
+        // Função para abrir o modal de nova audiência ou edição
+        window.openModal = (id = null) => {
+            if (!id) {
+                document.getElementById('hearing-form').reset();
+                document.getElementById('audiencia-id').value = '';
+                document.getElementById('modal-title').textContent = 'Cadastrar Nova Audiência';
+                document.getElementById('status').value = 'Agendada';
+            }
+            document.getElementById('add-hearing-modal').classList.remove('hidden');
+        };
+
+        // Função para fechar o modal
+        window.closeModal = () => {
+            document.getElementById('add-hearing-modal').classList.add('hidden');
+        };
+
+        // Função para lidar com o envio do formulário
+        window.handleFormSubmit = async (event) => {
+            event.preventDefault();
+
+            const form = event.target;
+            const id = form.elements['audiencia-id'].value;
+            const submitButton = document.getElementById('submit-button');
+            const originalButtonContent = submitButton.innerHTML;
+
+            const hearingData = {
+                date: form.elements['date'].value,
+                time: form.elements['time'].value,
+                reclamante: form.elements['reclamante'].value.trim(),
+                reclamada: form.elements['reclamada'].value.trim(),
+                processo: form.elements['processo'].value.trim(),
+                tipo: form.elements['tipo'].value,
+                modalidade: form.elements['modalidade'].value,
+                preposto: form.elements['preposto'].value.trim(),
+                responsavel: form.elements['responsavel'].value.trim(),
+                status: form.elements['status'].value,
+            };
+
+            // Validação simples
+            if (!hearingData.date || !hearingData.time || !hearingData.reclamante || !hearingData.reclamada || !hearingData.tipo || !hearingData.modalidade || !hearingData.responsavel) {
+                // Substitua alert() por uma mensagem de erro na UI em produção
+                alert('Por favor, preencha todos os campos obrigatórios.');
+                return;
+            }
+
+            // Inicia o estado de loading no botão
+            submitButton.disabled = true;
+            submitButton.innerHTML = `<div class="loader mr-2"></div> Salvando...`;
+
+            const meetingsRef = collection(db, DB_PATH('hearings'));
+
+            try {
+                if (id) {
+                    await withRetry(() => setDoc(doc(db, DB_PATH('hearings'), id), hearingData, { merge: true }));
+                    console.log("Audiência atualizada com ID:", id);
+                } else {
+                    hearingData.createdAt = serverTimestamp();
+                    hearingData.createdBy = userId;
+                    await withRetry(() => addDoc(meetingsRef, hearingData));
+                    console.log("Nova audiência adicionada.");
+                }
+
+                closeModal();
+            } catch (e) {
+                console.error("Erro ao adicionar/atualizar audiência: ", e);
+                alert('ERRO: Não foi possível salvar a audiência. Verifique sua conexão e tente novamente.'); 
+            } finally {
+                // Restaura o botão
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonContent;
+            }
+        };
+
+        // Função para deletar uma audiência
+        window.handleDelete = async (id) => {
+            if (!confirm(`Tem certeza que deseja excluir esta audiência?`)) return;
+
+            try {
+                await withRetry(() => deleteDoc(doc(db, DB_PATH('hearings'), id)));
+                console.log("Audiência deletada com ID:", id);
+            } catch (e) {
+                console.error("Erro ao deletar audiência: ", e);
+                alert('Erro ao deletar do banco de dados. Tente novamente.');
+            }
+        };
+
+        // Inicializa o Firebase
+        document.addEventListener('DOMContentLoaded', initFirebase);
+    </script>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <!-- Cabeçalho Principal -->
+    <header class="flex flex-col md:flex-row justify-between items-center mb-8 p-4 bg-white rounded-xl shadow-lg board-card">
+        <h1 class="text-3xl font-extrabold text-indigo-700">🗓️ Gestão de Audiências - Kanban</h1>
+        <div class="flex items-center space-x-4 mt-4 md:mt-0">
+            <span id="user-id-display" class="text-xs text-gray-500 bg-gray-100 p-2 rounded-lg truncate">Usuário ID: anonimo</span>
+            <button onclick="openModal()" class="flex items-center bg-indigo-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-indigo-700 transition duration-200 shadow-md hover:shadow-lg">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Nova Audiência
+            </button>
+        </div>
+    </header>
+
+    <!-- Quadro Principal (Kanban Board) -->
+    <main id="main-board" class="bg-white rounded-xl overflow-hidden board-card p-0">
+        <div id="kanban-board" class="w-full">
+            <!-- Colunas Kanban serão carregadas aqui pelo JS -->
+            <div class="p-6 text-center text-gray-500">Carregando Agenda...</div>
+        </div>
+    </main>
+    
+    <!-- Modal de Cadastro/Edição de Audiência -->
+    <div id="add-hearing-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden transition-opacity">
+        <div class="bg-white rounded-xl w-full max-w-lg p-6 m-4 shadow-2xl transform transition-all">
+            
+            <div class="flex justify-between items-center mb-6 border-b pb-3">
+                <h3 id="modal-title" class="text-xl font-bold text-gray-800">Cadastrar Nova Audiência</h3>
+                <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-gray-600 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <form id="hearing-form" onsubmit="handleFormSubmit(event)">
+                <input type="hidden" id="audiencia-id" name="audiencia-id">
+
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="date" class="block text-sm font-medium text-gray-700 mb-1">Data da Audiência *</label>
+                        <input type="date" id="date" name="date" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="time" class="block text-sm font-medium text-gray-700 mb-1">Horário *</label>
+                        <input type="time" id="time" name="time" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="reclamante" class="block text-sm font-medium text-gray-700 mb-1">Reclamante *</label>
+                    <input type="text" id="reclamante" name="reclamante" placeholder="Nome do Reclamante" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+
+                <div class="mb-4">
+                    <label for="reclamada" class="block text-sm font-medium text-gray-700 mb-1">Reclamada *</label>
+                    <input type="text" id="reclamada" name="reclamada" placeholder="Nome da Reclamada" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+
+                <div class="mb-4">
+                    <label for="processo" class="block text-sm font-medium text-gray-700 mb-1">Número do Processo</label>
+                    <input type="text" id="processo" name="processo" placeholder="Ex: 0010000-00.2023.5.00.0000" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="responsavel" class="block text-sm font-medium text-gray-700 mb-1">Responsável *</label>
+                        <input type="text" id="responsavel" name="responsavel" placeholder="Advogado ou Colaborador" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="preposto" class="block text-sm font-medium text-gray-700 mb-1">Preposto</label>
+                        <input type="text" id="preposto" name="preposto" placeholder="Preposto (se houver)" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label for="tipo" class="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
+                        <select id="tipo" name="tipo" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 appearance-none bg-white">
+                            <option value="">Selecione...</option>
+                            <option value="Inicial">Inicial</option>
+                            <option value="Instrução">Instrução</option>
+                            <option value="Conciliação">Conciliação</option>
+                            <option value="Una">Una</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="modalidade" class="block text-sm font-medium text-gray-700 mb-1">Modalidade *</label>
+                        <select id="modalidade" name="modalidade" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 appearance-none bg-white">
+                            <option value="">Selecione...</option>
+                            <option value="Virtual">Virtual</option>
+                            <option value="Presencial">Presencial</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+                        <select id="status" name="status" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 appearance-none bg-white">
+                            <option value="Agendada">Agendada</option>
+                            <option value="Em Preparação">Em Preparação</option>
+                            <option value="Realizada">Realizada</option>
+                            <option value="Atrasada">Atrasada</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-150">Cancelar</button>
+                    <button type="submit" id="submit-button" class="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-150 font-semibold">Salvar Audiência</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</body>
+</html>
