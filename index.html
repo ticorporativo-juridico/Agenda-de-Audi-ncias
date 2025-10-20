@@ -223,7 +223,7 @@
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
 
-        let db, auth;
+        let db, auth; // Variáveis db e auth devem ser inicializadas aqui
         let currentUserId = null;
         let currentView = 'dashboard';
         let allHearings = []; // Esta array armazena todos os dados de audiências
@@ -233,8 +233,8 @@
         async function setupApp() {
             try {
                 const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
+                db = getFirestore(app); // Garante que DB é definido GLOABALMENTE
+                auth = getAuth(app); // Garante que AUTH é definido GLOABALMENTE
 
                 // Autenticação com token customizado ou anônima
                 if (initialAuthToken) {
@@ -369,6 +369,14 @@
 
         async function handleFormSubmit(e) {
             e.preventDefault();
+            
+            // VERIFICAÇÃO CRÍTICA PARA O ERRO: Garante que o DB está inicializado
+            if (!db) {
+                console.error("Firestore DB não inicializado.");
+                showFeedback("ERRO: Não foi possível salvar a audiência. O banco de dados não está pronto. Tente recarregar.", 'error');
+                return;
+            }
+
             const form = e.target;
             const data = {
                 titulo: form.titulo.value,
@@ -421,6 +429,7 @@
                     showFeedback('Audiência atualizada com sucesso!', 'success');
                 } else {
                     // Cria
+                    // O erro estava sendo lançado AQUI, pois collection(db, ...) exige que 'db' seja um objeto válido do Firestore.
                     await addDoc(collection(db, collectionPath), data);
                     showFeedback('Nova audiência cadastrada com sucesso!', 'success');
                 }
@@ -428,7 +437,8 @@
                 closeModal();
             } catch (error) {
                 console.error("Erro ao salvar audiência:", error);
-                showFeedback(`ERRO: Não foi possível salvar a audiência. ${error.message}`, 'error');
+                // Exibe o erro original para o usuário (agora o erro será de permissão, se houver)
+                showFeedback(`ERRO: Não foi possível salvar a audiência. ${error.message}`, 'error'); 
             } finally {
                 saveText.textContent = 'Salvar Audiência';
                 saveBtn.disabled = false;
