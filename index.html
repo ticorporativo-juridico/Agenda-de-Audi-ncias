@@ -215,8 +215,9 @@
     <!-- Firebase Imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        // Importa setLogLevel para diagnóstico
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // --- Variáveis Globais de Configuração ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -225,13 +226,17 @@
 
         let db, auth; // Variáveis db e auth devem ser inicializadas aqui
         let currentUserId = null;
-        let currentView = 'dashboard';
+        let isFirebaseReady = false; // FLAG CRÍTICA: Indica que o DB foi inicializado
         let allHearings = []; // Esta array armazena todos os dados de audiências
         let editingHearingId = null;
+        let currentView = 'dashboard'; // CORREÇÃO: Inicializa a variável de controle da vista
 
         // --- Inicialização e Autenticação ---
         async function setupApp() {
             try {
+                // Ativa o modo de debug do Firestore para ver a inicialização no console
+                setLogLevel('debug'); 
+
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app); // Garante que DB é definido GLOABALMENTE
                 auth = getAuth(app); // Garante que AUTH é definido GLOABALMENTE
@@ -247,12 +252,14 @@
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         currentUserId = user.uid;
-                        startRealtimeListener();
                     } else {
                         // Fallback para ID anônimo se necessário
                         currentUserId = auth.currentUser?.uid || crypto.randomUUID();
-                        startRealtimeListener();
                     }
+                    
+                    // SÓ DEFINE COMO PRONTO APÓS A AUTENTICAÇÃO INICIAL
+                    isFirebaseReady = true; 
+                    startRealtimeListener();
                 });
             } catch (error) {
                 console.error("Erro ao configurar Firebase:", error);
@@ -279,7 +286,7 @@
             }
 
             // Remove todas as classes de cor e aplica a nova
-            feedbackMessage.className = feedbackMessage.className.replace(/bg-(red|green|yellow|indigo)-[0-9]{3}/g, bgColorClass);
+            feedbackMessage.className = feedbackMessage.className.replace(/bg-(red|green|yellow|indigo|gray)-[0-9]{3}/g, '').trim() + ' ' + bgColorClass;
             
             // Oculta após 5 segundos, a menos que seja um alerta de 48h (que é permanente)
             if (type !== 'alert') {
@@ -309,10 +316,15 @@
 
         // --- Funções de Data e Utilidade ---
         function formatDate(dateString) {
-            return new Date(dateString).toLocaleDateString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+            // Verifica se dataString é um valor válido
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return 'N/A';
+            return date.toLocaleDateString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
         }
 
         function timeUntil(dateString) {
+            if (!dateString) return 'N/A';
             const now = new Date();
             const target = new Date(dateString);
             const diffMs = target.getTime() - now.getTime();
@@ -333,7 +345,7 @@
 
         // Ouve dados em tempo real
         function startRealtimeListener() {
-            if (!db || !currentUserId) return;
+            if (!db || !currentUserId || !isFirebaseReady) return;
 
             // Define o caminho da coleção (dados públicos para colaboração)
             const collectionPath = `artifacts/${appId}/public/data/hearings`;
@@ -370,10 +382,10 @@
         async function handleFormSubmit(e) {
             e.preventDefault();
             
-            // VERIFICAÇÃO CRÍTICA PARA O ERRO: Garante que o DB está inicializado
-            if (!db) {
-                console.error("Firestore DB não inicializado.");
-                showFeedback("ERRO: Não foi possível salvar a audiência. O banco de dados não está pronto. Tente recarregar.", 'error');
+            // VERIFICAÇÃO CRÍTICA PARA O ERRO: Garante que o DB está inicializado E a flag está ativa
+            if (!db || !isFirebaseReady) {
+                console.error("Firestore DB não inicializado ou pronto. O salvamento foi abortado.");
+                showFeedback("ERRO: O banco de dados ainda está carregando ou não pôde ser inicializado. Tente novamente em alguns segundos.", 'error');
                 return;
             }
 
@@ -429,7 +441,6 @@
                     showFeedback('Audiência atualizada com sucesso!', 'success');
                 } else {
                     // Cria
-                    // O erro estava sendo lançado AQUI, pois collection(db, ...) exige que 'db' seja um objeto válido do Firestore.
                     await addDoc(collection(db, collectionPath), data);
                     showFeedback('Nova audiência cadastrada com sucesso!', 'success');
                 }
@@ -505,6 +516,12 @@
             // Usando modal customizado para confirmação (em vez de confirm())
             if (!confirm(`Tem certeza que deseja excluir a audiência: "${title}"?`)) return;
 
+            // Verifica a prontidão do Firebase antes de excluir
+            if (!db || !isFirebaseReady) {
+                showFeedback("O banco de dados não está pronto. Tente novamente em alguns segundos.", 'error');
+                return;
+            }
+
             try {
                 const docPath = `artifacts/${appId}/public/data/hearings/${id}`;
                 await deleteDoc(doc(db, docPath));
@@ -518,9 +535,9 @@
         // --- Funções de Renderização das Vistas ---
 
         function renderCard(h) {
-            const dataHora = new Date(h.dataHora);
-            const isPast = dataHora < new Date();
-            const timeDiff = timeUntil(h.dataHora);
+            const dataHora = h.dataHora ? new Date(h.dataHora) : null;
+            const isPast = dataHora && dataHora < new Date();
+            const timeDiff = h.dataHora ? timeUntil(h.dataHora) : 'N/A';
             
             // Determina o status para exibição (dá prioridade ao atraso)
             const displayStatus = h.isOverdue ? 'Atrasada' : h.status;
@@ -578,7 +595,7 @@
             `;
             
             const upcomingHearings = allHearings
-                .filter(h => new Date(h.dataHora) > new Date())
+                .filter(h => h.dataHora && new Date(h.dataHora) > new Date()) // Verifica se h.dataHora existe
                 .slice(0, 5);
 
             if (upcomingHearings.length === 0) {
@@ -596,7 +613,7 @@
         function renderCalendar() {
             const now = new Date();
             // Filtra apenas audiências que não foram realizadas ou que estão no futuro
-            const relevantHearings = allHearings.filter(h => h.status !== 'Realizada' || new Date(h.dataHora) >= now);
+            const relevantHearings = allHearings.filter(h => h.dataHora && (h.status !== 'Realizada' || new Date(h.dataHora) >= now));
 
             // Agrupa por dia (apenas a parte da data)
             const hearingsByDay = relevantHearings.reduce((acc, h) => {
@@ -611,7 +628,9 @@
             const sortedDates = Object.keys(hearingsByDay).sort();
             
             // Inclui o dia de hoje e todos os futuros
-            const startOfDayToday = now.setHours(0,0,0,0);
+            const startOfDayToday = new Date();
+            startOfDayToday.setHours(0,0,0,0);
+
             const futureDates = sortedDates.filter(date => new Date(date) >= startOfDayToday);
 
             if (futureDates.length === 0) {
@@ -659,6 +678,7 @@
 
             statuses.forEach(status => {
                 const columnHearings = allHearings.filter(h => {
+                    // Trata audiências atrasadas, forçando o status para 'Atrasada' se aplicável
                     const displayStatus = h.isOverdue ? 'Atrasada' : h.status;
                     return displayStatus === status.key;
                 });
@@ -697,8 +717,10 @@
             const container = document.getElementById('content-container');
             
             // Só exibe a mensagem de carregamento na primeira vez ou se a lista estiver vazia
-            if(allHearings.length === 0) {
-                container.innerHTML = `<div class="p-8 text-center text-gray-400">Carregando dados...</div>`;
+            if(allHearings.length === 0 && !isFirebaseReady) {
+                container.innerHTML = `<div class="p-8 text-center text-gray-400">Conectando ao banco de dados...</div>`;
+            } else if (allHearings.length === 0 && isFirebaseReady) {
+                container.innerHTML = `<div class="p-8 text-center text-gray-400">Nenhuma audiência encontrada. Adicione uma nova para começar.</div>`;
             }
 
             if (currentView === 'dashboard') {
