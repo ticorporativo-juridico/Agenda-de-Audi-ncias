@@ -22,6 +22,19 @@
         .drag-over {
             box-shadow: 0 0 0 4px #6366f1; /* Anel azul ao arrastar sobre */
         }
+
+        /* CORREÇÃO CRÍTICA PARA O SCROLL DO MODAL */
+        #hearing-modal {
+            /* Garante que o fundo ocupe toda a área visível */
+            height: 100vh;
+            width: 100vw;
+        }
+        #hearing-modal > div {
+             /* Permite que o conteúdo interno tenha no máximo a altura da tela e force o scroll dentro do modal se necessário */
+            max-height: 100vh;
+            overflow-y: auto;
+            max-width: full; /* Garante que caiba em qualquer largura */
+        }
     </style>
 </head>
 <body class="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans text-gray-800 dark:text-gray-200">
@@ -104,45 +117,45 @@
 
     <!-- MODAL DE AUDIÊNCIA (Oculto por padrão) -->
     <div id="hearing-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-xl p-6 md:p-8">
             <div class="flex justify-between items-center mb-4">
                 <h2 id="modal-title" class="text-2xl font-bold text-gray-900 dark:text-white"></h2>
                 <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"><svg class="w-6 h-6"><use href="#icon-x"></use></svg></button>
             </div>
             <form id="hearing-form" class="space-y-4">
-                <!-- TÍTULO/ASSUNTO -->
+                
+                <!-- GRUPO 1: TÍTULO -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Título/Assunto</label>
                     <input type="text" name="title" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Ex: Audiência de Conciliação" />
                 </div>
-                
-                <!-- RECLAMANTE -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Reclamante</label>
-                    <input type="text" name="reclamante" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome do Reclamante" />
+
+                <!-- GRUPO 2: RECLAMANTE / RECLAMADA (2 COLUNAS) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Reclamante</label>
+                        <input type="text" name="reclamante" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome do Reclamante" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Reclamada</label>
+                        <input type="text" name="reclamada" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome da Reclamada" />
+                    </div>
                 </div>
 
-                <!-- RECLAMADA -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Reclamada</label>
-                    <input type="text" name="reclamada" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome da Reclamada" />
+                <!-- GRUPO 3: DATA E HORA / RESPONSÁVEL (2 COLUNAS) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data e Horário</label>
+                        <input type="datetime-local" name="date" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Responsável (Advogado)</label>
+                        <input type="text" name="responsible" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome do Responsável" />
+                    </div>
                 </div>
 
-                <!-- RESPONSÁVEL (Quem está Cuidando) -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Responsável (Advogado/Paralegal)</label>
-                    <input type="text" name="responsible" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome do Responsável" />
-                </div>
-                
-                <!-- DATA E HORA -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data e Horário</label>
-                    <input type="datetime-local" name="date" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" />
-                </div>
-
-                <!-- TIPO DE AUDIÊNCIA e MODALIDADE (Lado a Lado em Mobile) -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <!-- TIPO DE AUDIÊNCIA -->
+                <!-- GRUPO 4: TIPO E MODALIDADE (2 COLUNAS) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de Audiência</label>
                         <select name="hearingType" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500">
@@ -153,8 +166,6 @@
                             <option value="Outro">Outro</option>
                         </select>
                     </div>
-                    
-                    <!-- MODALIDADE -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Modalidade</label>
                         <select name="modality" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500">
@@ -164,24 +175,24 @@
                         </select>
                     </div>
                 </div>
-
-                <!-- PREPOSTO -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Preposto</label>
-                    <input type="text" name="preposto" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome do Preposto (se houver)" />
-                </div>
-
-                <!-- STATUS (KANBAN) -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status (Kanban)</label>
-                    <select name="status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500">
-                        <option value="Pendente">Pendente</option>
-                        <option value="Em Andamento">Em Andamento</option>
-                        <option value="Concluída">Concluída</option>
-                    </select>
-                </div>
                 
-                <!-- DETALHES/PROCESSO -->
+                <!-- GRUPO 5: PREPOSTO / STATUS (2 COLUNAS) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Preposto</label>
+                        <input type="text" name="preposto" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nome do Preposto (se houver)" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status (Kanban)</label>
+                        <select name="status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500">
+                            <option value="Pendente">Pendente</option>
+                            <option value="Em Andamento">Em Andamento</option>
+                            <option value="Concluída">Concluída</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- GRUPO 6: DETALHES (FULL WIDTH) -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Detalhes Adicionais (Nº Processo, Vara, Link Virtual)</label>
                     <textarea name="details" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 border dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Nº do Processo, Vara, Link da Sala Virtual, etc."></textarea>
@@ -327,21 +338,35 @@
             const data = Object.fromEntries(formData.entries());
 
             try {
-                const hearingDate = new Date(data.date);
-                if (isNaN(hearingDate.getTime())) throw new Error("Data/hora inválida.");
+                // **CORREÇÃO DE BUG:** Garante que a data é válida antes de tentar criar o Timestamp
+                const hearingDateInput = data.date;
+                if (!hearingDateInput) {
+                    console.error("ERRO DE CADASTRO: O campo Data e Horário é obrigatório.");
+                    // Melhoria: Adicionar feedback visual ao usuário em vez de apenas console.error
+                    return; 
+                }
+
+                const hearingDate = new Date(hearingDateInput);
+                if (isNaN(hearingDate.getTime())) {
+                    console.error("ERRO DE CADASTRO: Data e/ou hora inválida. Verifique o formato.");
+                    return; // Impede o envio se a data for inválida
+                }
+
+                // Garante que o userId exista, mesmo com fallback, para seguir as regras de segurança
+                const userIdToSave = currentUserId || crypto.randomUUID();
 
                 const hearingData = {
                     title: data.title,
-                    reclamante: data.reclamante, // NOVO
-                    reclamada: data.reclamada,   // NOVO
+                    reclamante: data.reclamante,
+                    reclamada: data.reclamada,
                     responsible: data.responsible,
                     date: Timestamp.fromDate(hearingDate),
-                    hearingType: data.hearingType, // NOVO
-                    modality: data.modality,     // NOVO
-                    preposto: data.preposto,     // NOVO
+                    hearingType: data.hearingType,
+                    modality: data.modality,
+                    preposto: data.preposto || '', // Garante que campos opcionais tenham valor padrão
                     details: data.details,
                     status: data.status,
-                    userId: currentUserId || 'anon'
+                    userId: userIdToSave
                 };
 
                 const collectionRef = collection(db, `artifacts/${appId}/public/data/hearings`);
@@ -357,7 +382,7 @@
                 }
                 closeModal();
             } catch (error) {
-                console.error("Erro ao salvar audiência: ", error);
+                console.error("Erro ao salvar audiência (TRY/CATCH): ", error);
             }
         };
 
@@ -400,12 +425,12 @@
             if (hearing) {
                 // Preencher para Edição
                 hearingForm.elements.title.value = hearing.title || '';
-                hearingForm.elements.reclamante.value = hearing.reclamante || ''; // NOVO
-                hearingForm.elements.reclamada.value = hearing.reclamada || '';   // NOVO
+                hearingForm.elements.reclamante.value = hearing.reclamante || '';
+                hearingForm.elements.reclamada.value = hearing.reclamada || '';
                 hearingForm.elements.responsible.value = hearing.responsible || '';
-                hearingForm.elements.hearingType.value = hearing.hearingType || 'Conciliação'; // NOVO
-                hearingForm.elements.modality.value = hearing.modality || 'Presencial';     // NOVO
-                hearingForm.elements.preposto.value = hearing.preposto || '';     // NOVO
+                hearingForm.elements.hearingType.value = hearing.hearingType || 'Conciliação';
+                hearingForm.elements.modality.value = hearing.modality || 'Presencial';
+                hearingForm.elements.preposto.value = hearing.preposto || '';
                 hearingForm.elements.details.value = hearing.details || '';
                 hearingForm.elements.status.value = hearing.status || 'Pendente';
                 hearingForm.elements.id.value = hearing.id;
@@ -424,7 +449,7 @@
             } else {
                 // Novo Registro
                 hearingForm.elements.id.value = '';
-                hearingForm.elements.responsible.value = currentUserId || 'anon'; // Preenche com o ID atual
+                // REMOVEMOS o preenchimento automático do responsável para evitar o congelamento
                 hearingForm.elements.status.value = 'Pendente';
                 deleteBtn.classList.add('hidden');
                 submitBtn.textContent = 'Adicionar Audiência';
@@ -735,32 +760,43 @@
 
         // 8.1 Autenticação e Configuração
         const setupApp = async () => {
+            // Await a sign-in mechanism (custom token if available, otherwise anonymous)
             try {
                 if (initialAuthToken) {
-                    const userCredential = await signInWithCustomToken(auth, initialAuthToken);
-                    currentUserId = userCredential.user.uid;
+                    await signInWithCustomToken(auth, initialAuthToken);
                 } else {
-                    const userCredential = await signInAnonymously(auth);
-                    currentUserId = userCredential.user.uid;
+                    await signInAnonymously(auth);
                 }
             } catch (error) {
-                console.error("Erro na autenticação:", error);
-                currentUserId = crypto.randomUUID(); // Fallback
+                console.error("Erro na autenticação inicial. Continuando anonimamente/fallback:", error);
             }
 
-            // 8.2 Listener de Dados
-            const collectionRef = collection(db, `artifacts/${appId}/public/data/hearings`);
-            const q = query(collectionRef);
+            // Use onAuthStateChanged to ensure we get the final UID and then start fetching data
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUserId = user.uid;
+                } else {
+                    // Fallback to a random ID if the sign-in failed entirely
+                    currentUserId = crypto.randomUUID();
+                }
+                
+                // 8.2 Listener de Dados - INICIAR SOMENTE APÓS OBTENÇÃO DO USER ID
+                const collectionRef = collection(db, `artifacts/${appId}/public/data/hearings`);
+                const q = query(collectionRef);
 
-            onSnapshot(q, (snapshot) => {
-                hearings = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                updateUI();
-            }, (error) => {
-                console.error("Erro ao receber dados em tempo real:", error);
+                onSnapshot(q, (snapshot) => {
+                    hearings = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    updateUI();
+                }, (error) => {
+                    console.error("Erro ao receber dados em tempo real:", error);
+                });
             });
+
+            // Initial UI update to show the loading spinner until data arrives
+            updateUI(); 
         };
 
         // 8.3 Event Listeners UI
