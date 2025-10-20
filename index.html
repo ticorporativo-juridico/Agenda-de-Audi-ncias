@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestão de Audiências</title>
+    <title>Gestão de Audiências Local</title>
     <!-- Carrega Tailwind CSS para estilização e responsividade -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Estilos customizados para cores das tags e visual do Kanban */
         :root {
-            /* As cores primárias (tags) permanecem as mesmas para contraste */
             --color-alta: #ef4444; /* Vermelho */
             --color-media: #f97316; /* Laranja */
             --color-baixa: #3b82f6; /* Azul */
@@ -22,16 +21,6 @@
         .priority-media { background-color: var(--color-media); }
         .priority-baixa { background-color: var(--color-baixa); }
 
-        .status-preparacao { background-color: var(--color-preparacao); }
-        .status-agendada { background-color: var(--color-agendada); }
-        .status-atrasada { background-color: var(--color-atrasada); }
-        .status-realizada { background-color: var(--color-realizada); }
-
-        /* Garante que o container do Kanban possa rolar horizontalmente */
-        .kanban-container {
-            overflow-x: auto;
-            white-space: nowrap;
-        }
         .kanban-column {
             width: 320px;
             min-height: 400px;
@@ -39,12 +28,20 @@
             vertical-align: top;
             white-space: normal;
         }
-
+        /* Garante que o container do Kanban possa rolar horizontalmente */
+        .kanban-container {
+            overflow-x: auto;
+            white-space: nowrap;
+        }
         /* Estilo para garantir que o modal role em telas pequenas */
         .modal-body-scroll {
-            max-height: calc(100vh - 10rem); /* Altura máxima para caber na tela */
+            max-height: calc(100vh - 10rem); 
             overflow-y: auto;
         }
+        .status-preparacao { background-color: var(--color-preparacao); }
+        .status-agendada { background-color: var(--color-agendada); }
+        .status-atrasada { background-color: var(--color-atrasada); }
+        .status-realizada { background-color: var(--color-realizada); }
     </style>
 </head>
 <!-- Aplicando tema escuro: bg-gray-900 como fundo principal e texto claro por padrão -->
@@ -52,7 +49,6 @@
     
     <!-- Feedback Banner (Alertas de 48h, Sucesso, Erro) -->
     <div id="feedback-banner" class="fixed top-0 left-0 right-0 z-50 p-3 hidden transition-all duration-300">
-        <!-- O fundo da mensagem (feedback-message) será colorido dinamicamente no JS (success, error, alert) -->
         <div id="feedback-message" class="max-w-4xl mx-auto text-white p-3 rounded-lg shadow-lg flex items-center justify-between bg-indigo-600">
             <span></span>
             <button onclick="document.getElementById('feedback-banner').classList.add('hidden')" class="text-white hover:text-opacity-80 transition">
@@ -63,8 +59,8 @@
 
     <div class="max-w-full mx-auto p-4 sm:p-6 lg:p-8">
         <header class="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-gray-700 pb-4">
-            <!-- Textos principais em branco -->
-            <h1 class="text-3xl font-extrabold text-white">Gestão de Audiências</h1>
+            <!-- Título atualizado para refletir o armazenamento local -->
+            <h1 class="text-3xl font-extrabold text-white">Gestão de Audiências <span class="text-indigo-400 text-sm">(Local)</span></h1>
             <div class="mt-4 md:mt-0 flex space-x-3">
                 <button id="new-hearing-btn" onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
@@ -76,7 +72,6 @@
         <!-- Navegação (Quadro Principal, Calendário, Kanban) -->
         <nav class="mb-6 border-b border-gray-700">
             <ul class="flex space-x-6 text-lg font-medium">
-                <!-- Ajuste das cores dos botões para o tema escuro -->
                 <li><button class="tab-btn pb-3 border-b-2 border-indigo-500 text-indigo-400 transition duration-150" data-view="dashboard">Quadro Principal</button></li>
                 <li><button class="tab-btn pb-3 border-b-2 border-transparent hover:border-gray-600 text-gray-400 hover:text-gray-200 transition duration-150" data-view="calendar">Calendário</button></li>
                 <li><button class="tab-btn pb-3 border-b-2 border-transparent hover:border-gray-600 text-gray-400 hover:text-gray-200 transition duration-150" data-view="kanban">Kanban</button></li>
@@ -110,7 +105,6 @@
                     <h3 class="text-lg font-semibold border-b border-gray-700 pb-1 text-indigo-400">Partes e Detalhes</h3>
                     <div>
                         <label for="titulo" class="block text-sm font-medium text-gray-400">Título/Assunto</label>
-                        <!-- Inputs ajustados para tema escuro: fundo gray-700, borda gray-600, texto branco -->
                         <input type="text" id="titulo" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" placeholder="Ex: Audiência de Instrução - João vs ABC Ltda" required>
                     </div>
                     <div>
@@ -184,7 +178,7 @@
                                 <option value="Em Preparacao">Em Preparação</option>
                                 <option value="Agendada">Agendada</option>
                                 <option value="Realizada">Realizada</option>
-                                <option value="Atrasada">Atrasada</option>
+                                <!-- Nota: O status 'Atrasada' é aplicado automaticamente se a data for passada e o status não for 'Realizada' -->
                             </select>
                         </div>
                     </div>
@@ -212,58 +206,39 @@
         </div>
     </div>
 
-    <!-- Firebase Imports -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // Importa setLogLevel para diagnóstico
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // --- Variáveis Globais de Configuração ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
+    <!-- JavaScript para Lógica e Persistência Local -->
+    <script>
+        // Chave de armazenamento local
+        const STORAGE_KEY = 'audiencias_app_data';
 
-        let db, auth; // Variáveis db e auth devem ser inicializadas aqui
-        let currentUserId = null;
-        let isFirebaseReady = false; // FLAG CRÍTICA: Indica que o DB foi inicializado
-        let allHearings = []; // Esta array armazena todos os dados de audiências
+        let allHearings = []; // Array que armazena os dados
         let editingHearingId = null;
-        let currentView = 'dashboard'; // CORREÇÃO: Inicializa a variável de controle da vista
+        let currentView = 'dashboard';
 
-        // --- Inicialização e Autenticação ---
-        async function setupApp() {
+        // --- Funções de Persistência Local ---
+
+        function loadHearingsFromLocalStorage() {
             try {
-                // Ativa o modo de debug do Firestore para ver a inicialização no console
-                setLogLevel('debug'); 
-
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app); // Garante que DB é definido GLOABALMENTE
-                auth = getAuth(app); // Garante que AUTH é definido GLOABALMENTE
-
-                // Autenticação com token customizado ou anônima
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                // Observa o estado de autenticação para definir o userId
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        currentUserId = user.uid;
-                    } else {
-                        // Fallback para ID anônimo se necessário
-                        currentUserId = auth.currentUser?.uid || crypto.randomUUID();
-                    }
-                    
-                    // SÓ DEFINE COMO PRONTO APÓS A AUTENTICAÇÃO INICIAL
-                    isFirebaseReady = true; 
-                    startRealtimeListener();
-                });
+                const data = localStorage.getItem(STORAGE_KEY);
+                allHearings = data ? JSON.parse(data) : [];
+                // Garante que os dados estão ordenados por dataHora
+                allHearings.sort((a, b) => new Date(a.dataHora) - new Date(b.dataHora));
             } catch (error) {
-                console.error("Erro ao configurar Firebase:", error);
-                showFeedback("Erro ao conectar ao banco de dados. Recarregue a página.", 'error');
+                console.error("Erro ao carregar dados do localStorage:", error);
+                allHearings = [];
+            }
+        }
+
+        function saveHearingsToLocalStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(allHearings));
+                // Após salvar, re-renderiza para refletir as mudanças
+                renderCurrentView(); 
+                check48hAlerts();
+                showFeedback('Dados salvos localmente!', 'success');
+            } catch (error) {
+                console.error("Erro ao salvar dados no localStorage:", error);
+                showFeedback('Erro ao salvar os dados no navegador.', 'error');
             }
         }
 
@@ -275,8 +250,7 @@
             feedbackMessage.firstChild.textContent = message;
             feedbackBanner.classList.remove('hidden');
 
-            // Determina a cor de fundo do banner de feedback
-            let bgColorClass = 'bg-indigo-600'; // Default
+            let bgColorClass = 'bg-indigo-600';
             if (type === 'success') {
                 bgColorClass = 'bg-green-600';
             } else if (type === 'error') {
@@ -297,7 +271,6 @@
         }
 
         function check48hAlerts() {
-            // Oculta alertas anteriores
             feedbackBanner.classList.add('hidden');
             const now = new Date();
             const twoDays = 48 * 60 * 60 * 1000;
@@ -309,14 +282,13 @@
 
             if (soonHearings.length > 0) {
                 const h = soonHearings[0];
-                const dateStr = new Date(h.dataHora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+                const dateStr = new Date(h.dataHora).toLocaleDateString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
                 showFeedback(`ALERTA: Audiência próxima em 48h! **${h.titulo}** com ${h.reclamante} vs ${h.reclamada}. Resp: ${h.responsavel}. Data: ${dateStr}`, 'alert');
             }
         }
 
         // --- Funções de Data e Utilidade ---
         function formatDate(dateString) {
-            // Verifica se dataString é um valor válido
             if (!dateString) return 'N/A';
             const date = new Date(dateString);
             if (isNaN(date.getTime())) return 'N/A';
@@ -340,55 +312,19 @@
             if (diffMinutes > 0) return `${diffMinutes}m`;
             return 'Em minutos';
         }
-
-        // --- CRUD e Interação com Firestore ---
-
-        // Ouve dados em tempo real
-        function startRealtimeListener() {
-            if (!db || !currentUserId || !isFirebaseReady) return;
-
-            // Define o caminho da coleção (dados públicos para colaboração)
-            const collectionPath = `artifacts/${appId}/public/data/hearings`;
-            const hearingsCollection = collection(db, collectionPath);
-
-            onSnapshot(hearingsCollection, (snapshot) => {
-                const now = new Date();
-                
-                allHearings = snapshot.docs.map(doc => {
-                    const data = doc.data();
-                    const dateObj = new Date(data.dataHora);
-                    
-                    // Adiciona a propriedade calculada isOverdue
-                    data.isOverdue = (dateObj < now && data.status !== 'Realizada');
-                    
-                    return {
-                        id: doc.id,
-                        ...data
-                    };
-                }).sort((a, b) => new Date(a.dataHora) - new Date(b.dataHora));
-                
-                // IMPORTANTE: Chama a renderização da visualização atual
-                renderCurrentView();
-                check48hAlerts();
-            }, (error) => {
-                console.error("Erro ao obter dados em tempo real:", error);
-                showFeedback("Falha na conexão em tempo real com o Firestore.", 'error');
-            });
+        
+        // Função para gerar ID único
+        function generateId() {
+            return (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
         }
 
-        // Envia o formulário
+        // --- CRUD Local ---
+
         document.getElementById('hearing-form').addEventListener('submit', handleFormSubmit);
 
-        async function handleFormSubmit(e) {
+        function handleFormSubmit(e) {
             e.preventDefault();
             
-            // VERIFICAÇÃO CRÍTICA PARA O ERRO: Garante que o DB está inicializado E a flag está ativa
-            if (!db || !isFirebaseReady) {
-                console.error("Firestore DB não inicializado ou pronto. O salvamento foi abortado.");
-                showFeedback("ERRO: O banco de dados ainda está carregando ou não pôde ser inicializado. Tente novamente em alguns segundos.", 'error');
-                return;
-            }
-
             const form = e.target;
             const data = {
                 titulo: form.titulo.value,
@@ -408,7 +344,7 @@
                 dataHora: `${form.data.value}T${form.hora.value}:00`
             };
 
-            // Validação básica de data
+            // Validação básica
             if (!data.data || !data.hora) {
                 showFeedback("A data e o horário da audiência são obrigatórios.", 'error');
                 return;
@@ -417,43 +353,40 @@
                 showFeedback("O campo de Conclusão é obrigatório para audiências Realizadas.", 'error');
                 return;
             }
-            // Verifica se a audiência está atrasada no momento do salvamento (só para status)
+
             const now = new Date();
             const hearingDateTime = new Date(data.dataHora);
+            
+            // Lógica para determinar status de atraso no momento do salvamento
             if (hearingDateTime < now && data.status !== 'Realizada') {
-                // Força o status para 'Atrasada' se for passada e não estiver realizada
                 data.status = 'Atrasada'; 
             }
-
 
             const saveBtn = document.getElementById('save-hearing-btn');
             const saveText = document.getElementById('save-text');
             saveText.textContent = 'Salvando...';
             saveBtn.disabled = true;
 
-            try {
-                const collectionPath = `artifacts/${appId}/public/data/hearings`;
-
-                if (editingHearingId) {
-                    // Atualiza
-                    const docRef = doc(db, collectionPath, editingHearingId);
-                    await updateDoc(docRef, data);
+            if (editingHearingId) {
+                // Atualiza
+                const index = allHearings.findIndex(h => h.id === editingHearingId);
+                if (index !== -1) {
+                    allHearings[index] = { id: editingHearingId, ...data };
                     showFeedback('Audiência atualizada com sucesso!', 'success');
-                } else {
-                    // Cria
-                    await addDoc(collection(db, collectionPath), data);
-                    showFeedback('Nova audiência cadastrada com sucesso!', 'success');
                 }
-                
-                closeModal();
-            } catch (error) {
-                console.error("Erro ao salvar audiência:", error);
-                // Exibe o erro original para o usuário (agora o erro será de permissão, se houver)
-                showFeedback(`ERRO: Não foi possível salvar a audiência. ${error.message}`, 'error'); 
-            } finally {
-                saveText.textContent = 'Salvar Audiência';
-                saveBtn.disabled = false;
+            } else {
+                // Cria
+                data.id = generateId();
+                allHearings.push(data);
+                showFeedback('Nova audiência cadastrada com sucesso!', 'success');
             }
+
+            // Salva no localStorage e re-renderiza
+            saveHearingsToLocalStorage();
+            
+            saveText.textContent = 'Salvar Audiência';
+            saveBtn.disabled = false;
+            closeModal();
         }
 
         // Abre o modal para novo ou edição
@@ -477,9 +410,15 @@
                 document.getElementById('tipo').value = hearing.tipo || 'Conciliacao';
                 document.getElementById('modalidade').value = hearing.modalidade || 'Virtual';
                 document.getElementById('preposto').value = hearing.preposto || '';
-                // Se a audiência estiver atrasada, exibe o status original para edição (se houver)
                 document.getElementById('prioridade').value = hearing.prioridade || 'Baixa';
-                document.getElementById('status').value = hearing.isOverdue && hearing.status !== 'Realizada' ? 'Atrasada' : (hearing.status || 'Em Preparacao');
+                
+                // Determina o status a ser exibido (pode ser "Atrasada" se for passado)
+                const dateObj = new Date(hearing.dataHora);
+                const now = new Date();
+                const isOverdue = (dateObj < now && hearing.status !== 'Realizada');
+                
+                // O status exibido no modal deve ser o status real, a menos que esteja atrasado
+                document.getElementById('status').value = isOverdue && hearing.status !== 'Atrasada' ? 'Em Preparacao' : (hearing.status || 'Em Preparacao');
 
                 // Divide dataHora
                 const datePart = hearing.dataHora ? hearing.dataHora.substring(0, 10) : '';
@@ -512,23 +451,17 @@
             editingHearingId = null;
         }
 
-        window.deleteHearing = async (id, title) => {
-            // Usando modal customizado para confirmação (em vez de confirm())
-            if (!confirm(`Tem certeza que deseja excluir a audiência: "${title}"?`)) return;
+        window.deleteHearing = (id, title) => {
+            if (!confirm(`Tem certeza que deseja excluir a audiência: "${title}"? Esta ação é irreversível!`)) return;
 
-            // Verifica a prontidão do Firebase antes de excluir
-            if (!db || !isFirebaseReady) {
-                showFeedback("O banco de dados não está pronto. Tente novamente em alguns segundos.", 'error');
-                return;
-            }
+            const initialLength = allHearings.length;
+            allHearings = allHearings.filter(h => h.id !== id);
 
-            try {
-                const docPath = `artifacts/${appId}/public/data/hearings/${id}`;
-                await deleteDoc(doc(db, docPath));
+            if (allHearings.length < initialLength) {
+                saveHearingsToLocalStorage(); // Salva e re-renderiza
                 showFeedback('Audiência excluída com sucesso!', 'success');
-            } catch (error) {
-                console.error("Erro ao deletar audiência:", error);
-                showFeedback("Erro ao excluir audiência.", 'error');
+            } else {
+                showFeedback('Erro ao excluir audiência: ID não encontrado.', 'error');
             }
         }
 
@@ -536,15 +469,28 @@
 
         function renderCard(h) {
             const dataHora = h.dataHora ? new Date(h.dataHora) : null;
-            const isPast = dataHora && dataHora < new Date();
+            const now = new Date();
+            // Calcula se está atrasada (passada e não realizada)
+            const isOverdue = dataHora && dataHora < now && h.status !== 'Realizada'; 
+            
             const timeDiff = h.dataHora ? timeUntil(h.dataHora) : 'N/A';
             
-            // Determina o status para exibição (dá prioridade ao atraso)
-            const displayStatus = h.isOverdue ? 'Atrasada' : h.status;
-            
+            // O status para exibição no card
+            const displayStatus = isOverdue ? 'Atrasada' : h.status;
+
+            // Criamos um objeto com dados "seguros" para passar para openModal
+            const safeHearing = {
+                ...h,
+                // Garantir que o status do objeto passado para edição reflita o que o usuário preencheu, 
+                // a menos que esteja atrasado, nesse caso, ele pode ter que ser ajustado na lógica do modal.
+                // Mas aqui, focamos na renderização visual.
+                status: h.status, 
+                isOverdue: isOverdue // Adicionamos a flag para re-uso na renderização
+            };
+
             // Ajustando cores do card para o modo escuro (bg-gray-800, text-gray-200)
             return `
-                <div onclick="openModal(${JSON.stringify(h).replace(/"/g, '&quot;')})"
+                <div onclick="openModal(${JSON.stringify(safeHearing).replace(/"/g, '&quot;')})"
                     class="bg-gray-800 p-4 rounded-lg shadow-lg hover:shadow-xl transition cursor-pointer border-l-4 border-indigo-500 space-y-2">
                     <div class="flex justify-between items-start">
                         <h4 class="font-bold text-gray-200 break-words">${h.titulo}</h4>
@@ -560,8 +506,8 @@
                     </div>
 
                     <div class="flex justify-between items-center pt-2 border-t border-gray-700 mt-2">
-                        <span class="text-sm font-semibold ${isPast && h.status !== 'Realizada' ? 'text-red-400' : 'text-green-400'}">
-                            ${h.status === 'Realizada' ? 'FINALIZADA' : `Faltam: ${timeDiff}`}
+                        <span class="text-sm font-semibold ${displayStatus === 'Atrasada' ? 'text-red-400' : 'text-green-400'}">
+                            ${displayStatus === 'Realizada' ? 'FINALIZADA' : `Faltam: ${timeDiff}`}
                         </span>
                         <button onclick="event.stopPropagation(); deleteHearing('${h.id}', '${h.titulo}')" 
                                 class="text-red-400 hover:text-red-600 transition p-1 rounded-full hover:bg-gray-700" title="Excluir">
@@ -573,30 +519,40 @@
         }
 
         function renderDashboard() {
+            // Re-calcula isOverdue para exibição atualizada
+            const processedHearings = allHearings.map(h => {
+                const dataHora = h.dataHora ? new Date(h.dataHora) : null;
+                const now = new Date();
+                return {
+                    ...h,
+                    isOverdue: dataHora && dataHora < now && h.status !== 'Realizada'
+                };
+            });
+            
+            const upcomingHearings = processedHearings
+                .filter(h => h.dataHora && new Date(h.dataHora) > new Date()) // Filtra apenas futuras
+                .slice(0, 5);
+
             let html = `
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                     <!-- Cards de status em bg-gray-800 -->
                     <div class="bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-indigo-500">
                         <p class="text-lg font-semibold text-gray-400">Total de Audiências</p>
-                        <p class="text-4xl font-extrabold text-white">${allHearings.length}</p>
+                        <p class="text-4xl font-extrabold text-white">${processedHearings.length}</p>
                     </div>
                     <div class="bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-green-500">
                         <p class="text-lg font-semibold text-gray-400">Próximas (Em Preparação/Agendada)</p>
-                        <p class="text-4xl font-extrabold text-white">${allHearings.filter(h => !h.isOverdue && (h.status === 'Em Preparacao' || h.status === 'Agendada')).length}</p>
+                        <p class="text-4xl font-extrabold text-white">${processedHearings.filter(h => !h.isOverdue && (h.status === 'Em Preparacao' || h.status === 'Agendada')).length}</p>
                     </div>
                     <div class="bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-red-500">
                         <p class="text-lg font-semibold text-gray-400">Prioridade Alta (Pendentes/Atrasadas)</p>
-                        <p class="text-4xl font-extrabold text-white">${allHearings.filter(h => h.prioridade === 'Alta' && h.status !== 'Realizada').length}</p>
+                        <p class="text-4xl font-extrabold text-white">${processedHearings.filter(h => h.prioridade === 'Alta' && h.status !== 'Realizada').length}</p>
                     </div>
                 </div>
 
                 <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-gray-700 pb-2">5 Próximas Audiências</h2>
                 <div class="space-y-4">
             `;
-            
-            const upcomingHearings = allHearings
-                .filter(h => h.dataHora && new Date(h.dataHora) > new Date()) // Verifica se h.dataHora existe
-                .slice(0, 5);
 
             if (upcomingHearings.length === 0) {
                 html += `<div class="p-6 text-center text-gray-400 italic bg-gray-800 rounded-xl shadow-md">Nenhuma audiência futura agendada.</div>`;
@@ -612,14 +568,19 @@
 
         function renderCalendar() {
             const now = new Date();
-            // Filtra apenas audiências que não foram realizadas ou que estão no futuro
+            // Filtra audiências que não foram realizadas OU que estão no futuro
             const relevantHearings = allHearings.filter(h => h.dataHora && (h.status !== 'Realizada' || new Date(h.dataHora) >= now));
 
             // Agrupa por dia (apenas a parte da data)
             const hearingsByDay = relevantHearings.reduce((acc, h) => {
                 const dateKey = h.dataHora.substring(0, 10);
                 if (!acc[dateKey]) acc[dateKey] = [];
-                acc[dateKey].push(h);
+                
+                // Calcula se está atrasada para renderização
+                const dateObj = new Date(h.dataHora);
+                const isOverdue = dateObj < now && h.status !== 'Realizada';
+                
+                acc[dateKey].push({ ...h, isOverdue: isOverdue });
                 return acc;
             }, {});
 
@@ -631,7 +592,7 @@
             const startOfDayToday = new Date();
             startOfDayToday.setHours(0,0,0,0);
 
-            const futureDates = sortedDates.filter(date => new Date(date) >= startOfDayToday);
+            const futureDates = sortedDates.filter(date => new Date(date + 'T00:00:00') >= startOfDayToday);
 
             if (futureDates.length === 0) {
                  html += `<div class="p-6 text-center text-gray-400 italic bg-gray-800 rounded-xl shadow-md">Nenhuma audiência futura ou em andamento.</div>`;
@@ -676,10 +637,14 @@
                 <div class="kanban-container flex space-x-6 pb-4">
             `;
 
+            const now = new Date();
+
             statuses.forEach(status => {
                 const columnHearings = allHearings.filter(h => {
-                    // Trata audiências atrasadas, forçando o status para 'Atrasada' se aplicável
-                    const displayStatus = h.isOverdue ? 'Atrasada' : h.status;
+                    const dateObj = new Date(h.dataHora);
+                    // Lógica para determinar o status de exibição: prioriza Atrasada se for passado
+                    const isOverdue = dateObj < now && h.status !== 'Realizada';
+                    const displayStatus = isOverdue ? 'Atrasada' : h.status;
                     return displayStatus === status.key;
                 });
 
@@ -716,10 +681,7 @@
 
             const container = document.getElementById('content-container');
             
-            // Só exibe a mensagem de carregamento na primeira vez ou se a lista estiver vazia
-            if(allHearings.length === 0 && !isFirebaseReady) {
-                container.innerHTML = `<div class="p-8 text-center text-gray-400">Conectando ao banco de dados...</div>`;
-            } else if (allHearings.length === 0 && isFirebaseReady) {
+            if (allHearings.length === 0) {
                 container.innerHTML = `<div class="p-8 text-center text-gray-400">Nenhuma audiência encontrada. Adicione uma nova para começar.</div>`;
             }
 
@@ -740,8 +702,13 @@
         });
 
         // Inicializa a aplicação
-        setupApp();
-        renderCurrentView(); // Renderiza o estado inicial de loading
+        function initApp() {
+            loadHearingsFromLocalStorage();
+            renderCurrentView();
+            check48hAlerts();
+        }
+
+        window.onload = initApp;
     </script>
 </body>
 </html>
