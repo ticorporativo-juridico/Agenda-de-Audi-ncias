@@ -3,712 +3,619 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestão de Audiências Local</title>
-    <!-- Carrega Tailwind CSS para estilização e responsividade -->
+    <title>Agenda Jurídica Completa (Local)</title>
+    <!-- Carrega o Tailwind CSS para estilização moderna e responsiva -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Estilos customizados para cores das tags e visual do Kanban */
-        :root {
-            --color-alta: #ef4444; /* Vermelho */
-            --color-media: #f97316; /* Laranja */
-            --color-baixa: #3b82f6; /* Azul */
-            --color-preparacao: #9333ea; /* Roxo */
-            --color-agendada: #10b981; /* Verde */
-            --color-atrasada: #facc15; /* Amarelo */
-            --color-realizada: #06b6d4; /* Ciano */
-        }
-        .priority-alta { background-color: var(--color-alta); }
-        .priority-media { background-color: var(--color-media); }
-        .priority-baixa { background-color: var(--color-baixa); }
+        :root { font-family: 'Inter', sans-serif; }
+        
+        /* Definindo cores personalizadas para melhor controle e consistência */
+        .text-navy-main { color: #1E40AF; } /* Novo Azul Marinho Profundo (mais claro que o anterior) */
+        .bg-navy-main { background-color: #1E40AF; }
+        .hover\:bg-navy-hover:hover { background-color: #1c36a4; } /* Tom um pouco mais escuro para hover */
+        .text-yellow-500 { color: #F59E0B; } /* Amarelo Ferrari / Amber */
+        .bg-yellow-500 { background-color: #F59E0B; }
+        .hover\:bg-yellow-600:hover { background-color: #D97706; }
+        .border-yellow-500 { border-color: #F59E0B; }
 
-        .kanban-column {
-            width: 320px;
-            min-height: 400px;
-            display: inline-block;
-            vertical-align: top;
-            white-space: normal;
+        .dashboard-grid {
+            /* Layout responsivo: uma coluna no mobile, duas em telas maiores */
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
         }
-        /* Garante que o container do Kanban possa rolar horizontalmente */
-        .kanban-container {
-            overflow-x: auto;
-            white-space: nowrap;
+        @media (min-width: 1024px) {
+            /* Coluna de visualização maior, coluna de cadastro menor */
+            .dashboard-grid {
+                grid-template-columns: 2fr 1fr; 
+            }
         }
-        /* Estilo para garantir que o modal role em telas pequenas */
-        .modal-body-scroll {
-            max-height: calc(100vh - 10rem); 
-            overflow-y: auto;
+        
+        /* Ajuste de fonte para o painel de visualização */
+        .text-xl-tv { font-size: clamp(1.1rem, 2.5vw, 2.25rem); }
+        .text-lg-tv { font-size: clamp(0.9rem, 1.8vw, 1.3rem); }
+        .text-md-tv { font-size: clamp(0.8rem, 1.5vw, 1.1rem); }
+
+        /* --- CSS para o Efeito de Piscar (Alerta de Proximidade) --- */
+        /* Alerta piscando com cores de destaque Amarelo/Azul */
+        @keyframes flash-alert {
+            0%, 100% { background-color: #fffbeb; border-color: #fcd34d; } /* Amber-50 / Amber-300 */
+            50% { background-color: #fde68a; border-color: #fbbf24; } /* Amber-200 / Amber-400 */
         }
-        .status-preparacao { background-color: var(--color-preparacao); }
-        .status-agendada { background-color: var(--color-agendada); }
-        .status-atrasada { background-color: var(--color-atrasada); }
-        .status-realizada { background-color: var(--color-realizada); }
+        .flash-alert {
+            animation: flash-alert 1.5s infinite alternate ease-in-out;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.8); /* Yellow glow */
+            border-left-width: 8px !important; 
+        }
     </style>
 </head>
-<!-- Aplicando tema escuro: bg-gray-900 como fundo principal e texto claro por padrão -->
-<body class="bg-gray-900 antialiased font-sans text-gray-200">
-    
-    <!-- Feedback Banner (Alertas de 48h, Sucesso, Erro) -->
-    <div id="feedback-banner" class="fixed top-0 left-0 right-0 z-50 p-3 hidden transition-all duration-300">
-        <div id="feedback-message" class="max-w-4xl mx-auto text-white p-3 rounded-lg shadow-lg flex items-center justify-between bg-indigo-600">
-            <span></span>
-            <button onclick="document.getElementById('feedback-banner').classList.add('hidden')" class="text-white hover:text-opacity-80 transition">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
-            </button>
+<body class="bg-gray-100 min-h-screen p-4 lg:p-8">
+
+    <div id="loading" class="fixed inset-0 bg-gray-100 flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto"></div>
+            <p class="mt-4 text-navy-main font-semibold">Iniciando Aplicação Local...</p>
         </div>
     </div>
 
-    <div class="max-w-full mx-auto p-4 sm:p-6 lg:p-8">
-        <header class="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-gray-700 pb-4">
-            <!-- Título atualizado para refletir o armazenamento local -->
-            <h1 class="text-3xl font-extrabold text-white">Gestão de Audiências <span class="text-indigo-400 text-sm">(Local)</span></h1>
-            <div class="mt-4 md:mt-0 flex space-x-3">
-                <button id="new-hearing-btn" onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
-                    Nova Audiência
-                </button>
+    <!-- CABEÇALHO AGORA EM AZUL MARINHO (#1E40AF) -->
+    <header class="text-center mb-6 lg:mb-10 bg-navy-main p-6 rounded-xl shadow-xl max-w-7xl mx-auto">
+        <h1 class="text-3xl lg:text-5xl font-extrabold text-yellow-500">
+            Agenda Jurídica Completa
+        </h1>
+        <p id="week-range" class="text-xl lg:text-2xl font-medium text-gray-200 mt-2">
+            Visualize, cadastre e edite suas audiências em tempo real.
+        </p>
+    </header>
+
+    <main id="app-content" class="dashboard-grid max-w-7xl mx-auto" style="display:none;">
+
+        <!-- Coluna de Visualização (Dashboard) - TOPO -->
+        <section class="bg-white p-6 rounded-xl shadow-2xl lg:col-span-1 lg:order-1">
+            <h2 class="text-3xl font-bold text-navy-main mb-6 border-b-2 border-yellow-500 pb-2" id="dashboard-title">Próximas Audiências (Agenda Completa)</h2>
+            <div id="hearings-list" class="space-y-4">
+                <!-- As audiências serão injetadas aqui -->
             </div>
-        </header>
-
-        <!-- Navegação (Quadro Principal, Calendário, Kanban) -->
-        <nav class="mb-6 border-b border-gray-700">
-            <ul class="flex space-x-6 text-lg font-medium">
-                <li><button class="tab-btn pb-3 border-b-2 border-indigo-500 text-indigo-400 transition duration-150" data-view="dashboard">Quadro Principal</button></li>
-                <li><button class="tab-btn pb-3 border-b-2 border-transparent hover:border-gray-600 text-gray-400 hover:text-gray-200 transition duration-150" data-view="calendar">Calendário</button></li>
-                <li><button class="tab-btn pb-3 border-b-2 border-transparent hover:border-gray-600 text-gray-400 hover:text-gray-200 transition duration-150" data-view="kanban">Kanban</button></li>
-            </ul>
-        </nav>
-
-        <!-- Conteúdo das Vistas -->
-        <div id="content-container">
-            <!-- As visualizações serão injetadas aqui -->
-        </div>
-    </div>
-
-    <!-- Modal de Cadastro/Edição de Audiência -->
-    <div id="hearing-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
-        <!-- Fundo do modal em gray-800 -->
-        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl transform transition-all modal-body-scroll">
-            <div class="p-6 md:p-8 border-b border-gray-700 flex justify-between items-center sticky top-0 bg-gray-800 z-10">
-                <h2 id="modal-title" class="text-2xl font-bold text-gray-200">Nova Audiência</h2>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-300 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+            <div id="no-hearings-message" class="hidden mt-8 text-center p-8 bg-yellow-50 rounded-lg border-2 border-dashed border-yellow-300">
+                <p class="text-xl-tv font-semibold text-navy-main">
+                    🎉 Nenhuma audiência cadastrada ou pendente!
+                </p>
+                <p class="text-lg-tv text-gray-700 mt-2">
+                    Use o formulário ao lado para adicionar os processos à agenda.
+                </p>
             </div>
-            
-            <!-- Formulário -->
-            <form id="hearing-form" class="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- ID escondido para edição -->
-                <input type="hidden" id="hearing-id">
+        </section>
 
-                <!-- Coluna 1: Informações Principais da Audiência -->
-                <div class="md:col-span-1 space-y-4">
-                    <h3 class="text-lg font-semibold border-b border-gray-700 pb-1 text-indigo-400">Partes e Detalhes</h3>
+        <!-- Coluna de Cadastro/Edição - BAIXO -->
+        <section class="bg-white p-6 rounded-xl shadow-2xl h-fit lg:col-span-1 lg:order-2">
+            <h2 id="form-title" class="text-2xl font-bold text-navy-main mb-4 border-b-2 border-yellow-500 pb-2">Cadastrar Nova Audiência</h2>
+            <form id="hearing-form" class="space-y-4">
+                
+                <!-- Data e Hora -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label for="titulo" class="block text-sm font-medium text-gray-400">Título/Assunto</label>
-                        <input type="text" id="titulo" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" placeholder="Ex: Audiência de Instrução - João vs ABC Ltda" required>
+                        <label for="date" class="block text-sm font-medium text-gray-700">Data *</label>
+                        <input type="date" id="date" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
                     </div>
                     <div>
-                        <label for="reclamante" class="block text-sm font-medium text-gray-400">Reclamante</label>
-                        <input type="text" id="reclamante" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" placeholder="Nome do Reclamante" required>
-                    </div>
-                    <div>
-                        <label for="reclamada" class="block text-sm font-medium text-gray-400">Reclamada</label>
-                        <input type="text" id="reclamada" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" placeholder="Nome da Reclamada" required>
-                    </div>
-                    
-                    <h3 class="text-lg font-semibold border-b border-gray-700 pb-1 text-indigo-400 mt-6">Logística</h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="tipo" class="block text-sm font-medium text-gray-400">Tipo de Audiência</label>
-                            <select id="tipo" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" required>
-                                <option value="Conciliacao">Conciliação</option>
-                                <option value="Instrucao">Instrução</option>
-                                <option value="Julgamento">Julgamento</option>
-                                <option value="Inaugural">Inaugural</option>
-                                <option value="Outro">Outro</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="modalidade" class="block text-sm font-medium text-gray-400">Modalidade</label>
-                            <select id="modalidade" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" required>
-                                <option value="Virtual">Virtual</option>
-                                <option value="Presencial">Presencial</option>
-                                <option value="Hibrida">Híbrida</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <label for="preposto" class="block text-sm font-medium text-gray-400">Preposto</label>
-                        <input type="text" id="preposto" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" placeholder="Nome do Preposto (se houver)">
+                        <label for="time" class="block text-sm font-medium text-gray-700">Hora *</label>
+                        <input type="time" id="time" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
                     </div>
                 </div>
 
-                <!-- Coluna 2: Datas, Status e Responsável -->
-                <div class="md:col-span-1 space-y-4">
-                    <h3 class="text-lg font-semibold border-b border-gray-700 pb-1 text-indigo-400">Prazo e Gestão</h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="data" class="block text-sm font-medium text-gray-400">Data da Audiência</label>
-                            <input type="date" id="data" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" required>
-                        </div>
-                        <div>
-                            <label for="hora" class="block text-sm font-medium text-gray-400">Horário</label>
-                            <input type="time" id="hora" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" required>
-                        </div>
-                    </div>
-                    
+                <!-- N° Processo e Vara -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label for="responsavel" class="block text-sm font-medium text-gray-400">Advogado(a) / Gestor(a) do Caso</label>
-                        <input type="text" id="responsavel" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" placeholder="Nome do Advogado responsável" required>
+                        <label for="case-number" class="block text-sm font-medium text-gray-700">Nº do Processo *</label>
+                        <input type="text" id="case-number" required placeholder="Ex: 0012345-67.2023.8.26.0053" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
                     </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="prioridade" class="block text-sm font-medium text-gray-400">Prioridade</label>
-                            <select id="prioridade" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" required>
-                                <option value="Baixa">Baixa</option>
-                                <option value="Media">Média</option>
-                                <option value="Alta">Alta</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="status" class="block text-sm font-medium text-gray-400">Status (Kanban)</label>
-                            <select id="status" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" required>
-                                <option value="Em Preparacao">Em Preparação</option>
-                                <option value="Agendada">Agendada</option>
-                                <option value="Realizada">Realizada</option>
-                                <!-- Nota: O status 'Atrasada' é aplicado automaticamente se a data for passada e o status não for 'Realizada' -->
-                            </select>
-                        </div>
-                    </div>
-                    
                     <div>
-                        <label for="processo" class="block text-sm font-medium text-gray-400">Número do Processo / Vara</label>
-                        <input type="text" id="processo" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" placeholder="Ex: 0001234-56.2023.5.01.0000">
-                    </div>
-
-                    <!-- Campo condicional de conclusão (Aparece se Status for 'Realizada') -->
-                    <div id="conclusao-group" class="hidden">
-                        <label for="conclusao" class="block text-sm font-medium text-gray-400">Conclusão / Pauta Resumida</label>
-                        <textarea id="conclusao" rows="3" class="mt-1 block w-full border border-gray-600 rounded-lg shadow-sm p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 text-white" placeholder="Resumo do resultado da audiência."></textarea>
+                        <label for="vara" class="block text-sm font-medium text-gray-700">Vara *</label>
+                        <input type="text" id="vara" required placeholder="Ex: 3ª Vara Cível de São Paulo" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
                     </div>
                 </div>
 
-                <!-- Botão de Salvar -->
-                <div class="md:col-span-2 pt-4 border-t border-gray-700">
-                    <button type="submit" id="save-hearing-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition duration-150 flex items-center justify-center">
-                        <svg id="save-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M7.707 10.293a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 8.414V16a1 1 0 11-2 0V8.414l-1.293 1.293a1 1 0 01-1.414 0z" clip-rule="evenodd" fill-rule="evenodd"/><path d="M9 2a1 1 0 011-1h6a2 2 0 012 2v10a2 2 0 01-2 2h-6a1 1 0 01-1-1V2zM7 16a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2h1a2 2 0 012 2v12z" clip-rule="evenodd" fill-rule="evenodd"/></svg>
-                        <span id="save-text">Salvar Audiência</span>
-                    </button>
+                <!-- Reclamante e Reclamada -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="reclamante" class="block text-sm font-medium text-gray-700">Reclamante *</label>
+                        <input type="text" id="reclamante" required placeholder="Nome do Reclamante" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
+                    </div>
+                    <div>
+                        <label for="reclamada" class="block text-sm font-medium text-gray-700">Reclamada *</label>
+                        <input type="text" id="reclamada" required placeholder="Nome da Reclamada" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
+                    </div>
                 </div>
+
+                <!-- Natureza, Tipo de Audiência e Patrono -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="natureza" class="block text-sm font-medium text-gray-700">Natureza *</label>
+                        <input type="text" id="natureza" required placeholder="Ex: Trabalhista / Cível" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
+                    </div>
+                    <div>
+                        <label for="tipo-audiencia" class="block text-sm font-medium text-gray-700">Tipo de Audiência *</label>
+                        <input type="text" id="tipo-audiencia" required placeholder="Ex: Instrução e Julgamento" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
+                    </div>
+                    <div>
+                        <label for="patrono" class="block text-sm font-medium text-gray-700">Patrono</label>
+                        <input type="text" id="patrono" placeholder="OAB e Nome do Patrono" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
+                    </div>
+                </div>
+
+                <!-- Endereço (Tipo e Campo) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="endereco-tipo" class="block text-sm font-medium text-gray-700">Tipo de Endereço *</label>
+                        <select id="endereco-tipo" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
+                            <option value="Virtual">Virtual (Link)</option>
+                            <option value="Presencial">Presencial (Endereço)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="endereco-link" class="block text-sm font-medium text-gray-700"><span id="endereco-label">Link da Audiência</span> *</label>
+                        <input type="text" id="endereco-link" required placeholder="https://linkdaaudiencia.com.br" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
+                    </div>
+                </div>
+
+                <!-- Testemunha e Preposto -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="testemunha" class="block text-sm font-medium text-gray-700">Testemunha(s) (Opcional)</label>
+                        <textarea id="testemunha" rows="1" placeholder="Nomes ou detalhes das testemunhas" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150"></textarea>
+                    </div>
+                    <div>
+                        <label for="preposto" class="block text-sm font-medium text-gray-700">Preposto (Opcional)</label>
+                        <input type="text" id="preposto" placeholder="Nome do Preposto" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150">
+                    </div>
+                </div>
+                
+                <!-- Observações (Descrição) -->
+                <div>
+                    <label for="description" class="block text-sm font-medium text-gray-700">Observações (Opcional)</label>
+                    <textarea id="description" rows="2" placeholder="Informações adicionais importantes" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 focus:ring-yellow-500 focus:border-yellow-500 transition duration-150"></textarea>
+                </div>
+
+                <!-- Botões de Ação (Cadastro/Salvar) - AMARERO E AZUL CONTRASTE -->
+                <button type="submit" id="submit-btn" class="w-full py-3 px-4 border border-transparent rounded-lg shadow-md text-lg font-medium text-navy-main bg-yellow-500 hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition duration-150 ease-in-out">
+                    Cadastrar Audiência
+                </button>
             </form>
+            <div id="message-box" class="mt-4 hidden p-3 rounded-lg text-center" role="alert"></div>
+        </section>
+    </main>
+
+    <!-- Modal Customizado para Confirmação de Exclusão -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-[100]">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full">
+            <h3 class="text-xl font-bold mb-4 text-red-600">Confirmar Exclusão</h3>
+            <p class="mb-6 text-gray-700">Tem certeza de que deseja excluir esta audiência? Esta ação é irreversível.</p>
+            <div class="flex justify-end space-x-3">
+                <button id="cancel-delete" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-150">Cancelar</button>
+                <button id="confirm-delete" data-doc-id="" class="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition duration-150">Excluir</button>
+            </div>
         </div>
     </div>
 
-    <!-- JavaScript para Lógica e Persistência Local -->
-    <script>
-        // Chave de armazenamento local
-        const STORAGE_KEY = 'audiencias_app_data';
 
-        let allHearings = []; // Array que armazena os dados
-        let editingHearingId = null;
-        let currentView = 'dashboard';
+    <script type="module">
+        // --- Variáveis Globais ---
+        const STORAGE_KEY = 'judicial_hearings';
+        let isAppReady = false; 
+        let editingHearingId = null; 
 
-        // --- Funções de Persistência Local ---
-
-        function loadHearingsFromLocalStorage() {
-            try {
-                const data = localStorage.getItem(STORAGE_KEY);
-                allHearings = data ? JSON.parse(data) : [];
-                // Garante que os dados estão ordenados por dataHora
-                allHearings.sort((a, b) => new Date(a.dataHora) - new Date(b.dataHora));
-            } catch (error) {
-                console.error("Erro ao carregar dados do localStorage:", error);
-                allHearings = [];
-            }
-        }
-
-        function saveHearingsToLocalStorage() {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(allHearings));
-                // Após salvar, re-renderiza para refletir as mudanças
-                renderCurrentView(); 
-                check48hAlerts();
-                showFeedback('Dados salvos localmente!', 'success');
-            } catch (error) {
-                console.error("Erro ao salvar dados no localStorage:", error);
-                showFeedback('Erro ao salvar os dados no navegador.', 'error');
-            }
-        }
-
-        // --- Funções de Feedback e UI ---
-        const feedbackBanner = document.getElementById('feedback-banner');
-        const feedbackMessage = document.getElementById('feedback-message');
+        // Elementos da UI
+        const loadingScreen = document.getElementById('loading');
+        const appContent = document.getElementById('app-content');
+        const form = document.getElementById('hearing-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const messageBox = document.getElementById('message-box');
+        const hearingsList = document.getElementById('hearings-list');
+        const noHearingsMessage = document.getElementById('no-hearings-message');
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmDeleteBtn = document.getElementById('confirm-delete');
+        const cancelDeleteBtn = document.getElementById('cancel-delete');
+        const formTitle = document.getElementById('form-title');
         
-        function showFeedback(message, type) {
-            feedbackMessage.firstChild.textContent = message;
-            feedbackBanner.classList.remove('hidden');
+        // Elementos de Endereço Condicional
+        const enderecoTipoSelect = document.getElementById('endereco-tipo');
+        const enderecoLinkInput = document.getElementById('endereco-link');
+        const enderecoLabel = document.getElementById('endereco-label');
 
-            let bgColorClass = 'bg-indigo-600';
+
+        // --- Funções de Utilidade ---
+
+        /** Exibe uma mensagem de feedback na UI. */
+        function showMessage(message, type) {
+            messageBox.textContent = message;
+            messageBox.className = 'mt-4 p-3 rounded-lg text-center';
             if (type === 'success') {
-                bgColorClass = 'bg-green-600';
+                messageBox.classList.add('bg-green-100', 'text-green-800', 'border', 'border-green-300');
             } else if (type === 'error') {
-                bgColorClass = 'bg-red-600';
-            } else if (type === 'alert') {
-                bgColorClass = 'bg-yellow-600';
+                messageBox.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-300');
             }
-
-            // Remove todas as classes de cor e aplica a nova
-            feedbackMessage.className = feedbackMessage.className.replace(/bg-(red|green|yellow|indigo|gray)-[0-9]{3}/g, '').trim() + ' ' + bgColorClass;
-            
-            // Oculta após 5 segundos, a menos que seja um alerta de 48h (que é permanente)
-            if (type !== 'alert') {
-                setTimeout(() => {
-                    feedbackBanner.classList.add('hidden');
-                }, 5000);
-            }
+            messageBox.style.display = 'block';
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 5000);
         }
 
-        function check48hAlerts() {
-            feedbackBanner.classList.add('hidden');
-            const now = new Date();
-            const twoDays = 48 * 60 * 60 * 1000;
-            const soonHearings = allHearings.filter(h => {
-                const date = new Date(h.dataHora);
-                const diff = date.getTime() - now.getTime();
-                return diff > 0 && diff <= twoDays && h.status !== 'Realizada';
-            });
-
-            if (soonHearings.length > 0) {
-                const h = soonHearings[0];
-                const dateStr = new Date(h.dataHora).toLocaleDateString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-                showFeedback(`ALERTA: Audiência próxima em 48h! **${h.titulo}** com ${h.reclamante} vs ${h.reclamada}. Resp: ${h.responsavel}. Data: ${dateStr}`, 'alert');
-            }
-        }
-
-        // --- Funções de Data e Utilidade ---
-        function formatDate(dateString) {
-            if (!dateString) return 'N/A';
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return 'N/A';
-            return date.toLocaleDateString('pt-BR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-        }
-
-        function timeUntil(dateString) {
-            if (!dateString) return 'N/A';
-            const now = new Date();
-            const target = new Date(dateString);
-            const diffMs = target.getTime() - now.getTime();
-
-            if (diffMs < 0) return 'Passada';
-
-            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-            const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-            if (diffDays > 0) return `${diffDays}d ${diffHours}h`;
-            if (diffHours > 0) return `${diffHours}h ${diffMinutes}m`;
-            if (diffMinutes > 0) return `${diffMinutes}m`;
-            return 'Em minutos';
+        /** Formata uma data para o padrão de exibição DD/MM. */
+        function formatDateForDisplay(dateString) {
+            if (!dateString) return '';
+            const [year, month, day] = dateString.split('-');
+            return `${day}/${month}`;
         }
         
-        // Função para gerar ID único
-        function generateId() {
-            return (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-        }
-
-        // --- CRUD Local ---
-
-        document.getElementById('hearing-form').addEventListener('submit', handleFormSubmit);
-
-        function handleFormSubmit(e) {
-            e.preventDefault();
-            
-            const form = e.target;
-            const data = {
-                titulo: form.titulo.value,
-                reclamante: form.reclamante.value,
-                reclamada: form.reclamada.value,
-                responsavel: form.responsavel.value,
-                data: form.data.value,
-                hora: form.hora.value,
-                processo: form.processo.value,
-                tipo: form.tipo.value,
-                modalidade: form.modalidade.value,
-                preposto: form.preposto.value || 'N/A',
-                prioridade: form.prioridade.value,
-                status: form.status.value,
-                conclusao: form.conclusao.value || '',
-                // Armazena data e hora juntas para facilitar a ordenação
-                dataHora: `${form.data.value}T${form.hora.value}:00`
-            };
-
-            // Validação básica
-            if (!data.data || !data.hora) {
-                showFeedback("A data e o horário da audiência são obrigatórios.", 'error');
-                return;
-            }
-            if (data.status === 'Realizada' && !data.conclusao) {
-                showFeedback("O campo de Conclusão é obrigatório para audiências Realizadas.", 'error');
-                return;
-            }
-
-            const now = new Date();
-            const hearingDateTime = new Date(data.dataHora);
-            
-            // Lógica para determinar status de atraso no momento do salvamento
-            if (hearingDateTime < now && data.status !== 'Realizada') {
-                data.status = 'Atrasada'; 
-            }
-
-            const saveBtn = document.getElementById('save-hearing-btn');
-            const saveText = document.getElementById('save-text');
-            saveText.textContent = 'Salvando...';
-            saveBtn.disabled = true;
-
-            if (editingHearingId) {
-                // Atualiza
-                const index = allHearings.findIndex(h => h.id === editingHearingId);
-                if (index !== -1) {
-                    allHearings[index] = { id: editingHearingId, ...data };
-                    showFeedback('Audiência atualizada com sucesso!', 'success');
-                }
+        /** Atualiza o rótulo do campo Endereço/Link com base na seleção. */
+        function updateAddressLabel() {
+            if (enderecoTipoSelect.value === 'Virtual') {
+                enderecoLabel.textContent = 'Link da Audiência';
+                enderecoLinkInput.placeholder = 'https://linkdaaudiencia.com.br';
             } else {
-                // Cria
-                data.id = generateId();
-                allHearings.push(data);
-                showFeedback('Nova audiência cadastrada com sucesso!', 'success');
+                enderecoLabel.textContent = 'Endereço Completo';
+                enderecoLinkInput.placeholder = 'Ex: Rua, número, cidade, estado';
             }
-
-            // Salva no localStorage e re-renderiza
-            saveHearingsToLocalStorage();
-            
-            saveText.textContent = 'Salvar Audiência';
-            saveBtn.disabled = false;
-            closeModal();
         }
+        
+        // --- Lógica de Edição ---
 
-        // Abre o modal para novo ou edição
-        window.openModal = (hearing = null) => {
-            const modal = document.getElementById('hearing-modal');
-            const form = document.getElementById('hearing-form');
-            const modalTitle = document.getElementById('modal-title');
-            const conclusionGroup = document.getElementById('conclusao-group');
-
-            editingHearingId = hearing ? hearing.id : null;
-            modalTitle.textContent = hearing ? 'Editar Audiência' : 'Nova Audiência';
-            form.reset();
-
-            if (hearing) {
-                document.getElementById('hearing-id').value = hearing.id;
-                document.getElementById('titulo').value = hearing.titulo || '';
-                document.getElementById('reclamante').value = hearing.reclamante || '';
-                document.getElementById('reclamada').value = hearing.reclamada || '';
-                document.getElementById('responsavel').value = hearing.responsavel || '';
-                document.getElementById('processo').value = hearing.processo || '';
-                document.getElementById('tipo').value = hearing.tipo || 'Conciliacao';
-                document.getElementById('modalidade').value = hearing.modalidade || 'Virtual';
-                document.getElementById('preposto').value = hearing.preposto || '';
-                document.getElementById('prioridade').value = hearing.prioridade || 'Baixa';
-                
-                // Determina o status a ser exibido (pode ser "Atrasada" se for passado)
-                const dateObj = new Date(hearing.dataHora);
-                const now = new Date();
-                const isOverdue = (dateObj < now && hearing.status !== 'Realizada');
-                
-                // O status exibido no modal deve ser o status real, a menos que esteja atrasado
-                document.getElementById('status').value = isOverdue && hearing.status !== 'Atrasada' ? 'Em Preparacao' : (hearing.status || 'Em Preparacao');
-
-                // Divide dataHora
-                const datePart = hearing.dataHora ? hearing.dataHora.substring(0, 10) : '';
-                const timePart = hearing.dataHora ? hearing.dataHora.substring(11, 16) : '';
-                document.getElementById('data').value = datePart;
-                document.getElementById('hora').value = timePart;
-                
-                document.getElementById('conclusao').value = hearing.conclusao || '';
-            }
-
-            // Listener para mostrar/esconder campo Conclusão
-            document.getElementById('status').onchange = (e) => {
-                if (e.target.value === 'Realizada') {
-                    conclusionGroup.classList.remove('hidden');
-                    document.getElementById('conclusao').setAttribute('required', 'required');
-                } else {
-                    conclusionGroup.classList.add('hidden');
-                    document.getElementById('conclusao').removeAttribute('required');
-                }
-            };
-
-            // Dispara o listener imediatamente se estiver em edição
-            document.getElementById('status').dispatchEvent(new Event('change'));
-
-            modal.classList.remove('hidden');
-        }
-
-        window.closeModal = () => {
-            document.getElementById('hearing-modal').classList.add('hidden');
+        /** Reseta o formulário e o estado de edição. */
+        function cancelEdit() {
             editingHearingId = null;
-        }
+            form.reset();
+            updateAddressLabel(); // Garante que o rótulo do endereço volte ao padrão
+            
+            formTitle.textContent = 'Cadastrar Nova Audiência';
+            submitBtn.textContent = 'Cadastrar Audiência';
+            
+            // Reverte para o estilo de Cadastro (Amarelo Principal)
+            // Usa as classes de cores customizadas
+            submitBtn.classList.remove('bg-navy-main', 'hover:bg-navy-hover', 'text-yellow-500', 'focus:ring-navy-main');
+            submitBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600', 'text-navy-main', 'focus:ring-yellow-500');
 
-        window.deleteHearing = (id, title) => {
-            if (!confirm(`Tem certeza que deseja excluir a audiência: "${title}"? Esta ação é irreversível!`)) return;
-
-            const initialLength = allHearings.length;
-            allHearings = allHearings.filter(h => h.id !== id);
-
-            if (allHearings.length < initialLength) {
-                saveHearingsToLocalStorage(); // Salva e re-renderiza
-                showFeedback('Audiência excluída com sucesso!', 'success');
-            } else {
-                showFeedback('Erro ao excluir audiência: ID não encontrado.', 'error');
+            // Remove o botão de Cancelar Edição se ele existir
+            const cancelBtn = document.getElementById('cancel-edit-btn');
+            if (cancelBtn) {
+                cancelBtn.remove();
             }
         }
 
-        // --- Funções de Renderização das Vistas ---
+        /** Inicia o modo de edição, preenchendo o formulário. */
+        function startEdit(docId) {
+            const hearings = getHearingsFromLocalStorage();
+            const hearingToEdit = hearings.find(h => h.id === docId);
 
-        function renderCard(h) {
-            const dataHora = h.dataHora ? new Date(h.dataHora) : null;
-            const now = new Date();
-            // Calcula se está atrasada (passada e não realizada)
-            const isOverdue = dataHora && dataHora < now && h.status !== 'Realizada'; 
+            if (!hearingToEdit) {
+                return showMessage("Erro: Audiência não encontrada para edição.", 'error');
+            }
+
+            // 1. Define o estado de edição
+            editingHearingId = docId;
+
+            // 2. Preenche o formulário
+            document.getElementById('date').value = hearingToEdit.date;
+            document.getElementById('time').value = hearingToEdit.time;
+            document.getElementById('case-number').value = hearingToEdit.caseNumber;
+            document.getElementById('vara').value = hearingToEdit.vara;
+            document.getElementById('reclamada').value = hearingToEdit.reclamada;
+            document.getElementById('reclamante').value = hearingToEdit.reclamante;
+            document.getElementById('natureza').value = hearingToEdit.natureza;
+            document.getElementById('patrono').value = hearingToEdit.patrono;
+            document.getElementById('tipo-audiencia').value = hearingToEdit.tipoAudiencia;
+            enderecoTipoSelect.value = hearingToEdit.enderecoTipo;
+            enderecoLinkInput.value = hearingToEdit.enderecoLink;
+            document.getElementById('testemunha').value = hearingToEdit.testemunha;
+            document.getElementById('preposto').value = hearingToEdit.preposto;
+            document.getElementById('description').value = hearingToEdit.description;
+
+            // 3. Atualiza a UI (título, botão e adiciona o Cancelar)
+            updateAddressLabel(); // Garante que o rótulo do endereço atualize
             
-            const timeDiff = h.dataHora ? timeUntil(h.dataHora) : 'N/A';
+            formTitle.textContent = `Editando Audiência: ${hearingToEdit.caseNumber}`;
+            submitBtn.textContent = 'Salvar Alterações';
             
-            // O status para exibição no card
-            const displayStatus = isOverdue ? 'Atrasada' : h.status;
+            // Define o estilo de Edição (Azul Marinho Principal com texto Amarelo)
+            // Usa as classes de cores customizadas
+            submitBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600', 'text-navy-main', 'focus:ring-yellow-500');
+            submitBtn.classList.add('bg-navy-main', 'hover:bg-navy-hover', 'text-yellow-500', 'focus:ring-navy-main');
 
-            // Criamos um objeto com dados "seguros" para passar para openModal
-            const safeHearing = {
-                ...h,
-                // Garantir que o status do objeto passado para edição reflita o que o usuário preencheu, 
-                // a menos que esteja atrasado, nesse caso, ele pode ter que ser ajustado na lógica do modal.
-                // Mas aqui, focamos na renderização visual.
-                status: h.status, 
-                isOverdue: isOverdue // Adicionamos a flag para re-uso na renderização
-            };
+            // Adiciona o botão de Cancelar Edição se ele não estiver lá
+            if (!document.getElementById('cancel-edit-btn')) {
+                const cancelBtn = document.createElement('button');
+                cancelBtn.type = 'button';
+                cancelBtn.id = 'cancel-edit-btn';
+                cancelBtn.textContent = 'Cancelar Edição';
+                // Estilo para o botão de Cancelar (Amarelo claro)
+                cancelBtn.className = 'w-full py-3 px-4 rounded-lg text-lg font-medium text-navy-main bg-yellow-200 hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition duration-150 ease-in-out';
+                cancelBtn.addEventListener('click', cancelEdit);
+                // Insere o botão de Cancelar logo antes do botão de Salvar
+                submitBtn.parentElement.insertBefore(cancelBtn, submitBtn);
+            }
+            
+            // Rola para o formulário para facilitar a edição em dispositivos móveis
+            form.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // --- Lógica do Local Storage ---
 
-            // Ajustando cores do card para o modo escuro (bg-gray-800, text-gray-200)
-            return `
-                <div onclick="openModal(${JSON.stringify(safeHearing).replace(/"/g, '&quot;')})"
-                    class="bg-gray-800 p-4 rounded-lg shadow-lg hover:shadow-xl transition cursor-pointer border-l-4 border-indigo-500 space-y-2">
-                    <div class="flex justify-between items-start">
-                        <h4 class="font-bold text-gray-200 break-words">${h.titulo}</h4>
-                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full text-white ${'priority-' + h.prioridade.toLowerCase()}">${h.prioridade.toUpperCase()}</span>
-                    </div>
-                    
-                    <div class="text-sm text-gray-400 space-y-1">
-                        <p><span class="font-medium text-gray-300">Partes:</span> ${h.reclamante} vs ${h.reclamada}</p>
-                        <p><span class="font-medium text-gray-300">Data:</span> ${formatDate(h.dataHora)}</p>
-                        <p><span class="font-medium text-gray-300">Responsável:</span> ${h.responsavel}</p>
-                        <p><span class="font-medium text-gray-300">Processo:</span> ${h.processo || 'N/A'}</p>
-                        <p><span class="font-medium text-gray-300">Modalidade:</span> ${h.modalidade}</p>
-                    </div>
-
-                    <div class="flex justify-between items-center pt-2 border-t border-gray-700 mt-2">
-                        <span class="text-sm font-semibold ${displayStatus === 'Atrasada' ? 'text-red-400' : 'text-green-400'}">
-                            ${displayStatus === 'Realizada' ? 'FINALIZADA' : `Faltam: ${timeDiff}`}
-                        </span>
-                        <button onclick="event.stopPropagation(); deleteHearing('${h.id}', '${h.titulo}')" 
-                                class="text-red-400 hover:text-red-600 transition p-1 rounded-full hover:bg-gray-700" title="Excluir">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" /></svg>
-                        </button>
-                    </div>
-                </div>
-            `;
+        /** Obtém todas as audiências do localStorage. */
+        function getHearingsFromLocalStorage() {
+            const data = localStorage.getItem(STORAGE_KEY);
+            try {
+                return data ? JSON.parse(data) : [];
+            } catch (e) {
+                console.error("Erro ao analisar dados do localStorage. Dados corrompidos.", e);
+                return [];
+            }
+        }
+        
+        /** Inicializa a aplicação (sem Firebase, apenas para UI e localStorage). */
+        function initializeApp() {
+            loadingScreen.style.display = 'none';
+            appContent.style.display = 'grid';
+            isAppReady = true;
+            updateAddressLabel(); 
+            loadHearings();
         }
 
-        function renderDashboard() {
-            // Re-calcula isOverdue para exibição atualizada
-            const processedHearings = allHearings.map(h => {
-                const dataHora = h.dataHora ? new Date(h.dataHora) : null;
-                const now = new Date();
-                return {
-                    ...h,
-                    isOverdue: dataHora && dataHora < now && h.status !== 'Realizada'
-                };
+        /** Adiciona ou Atualiza uma audiência no localStorage. */
+        async function saveHearing(e) {
+            e.preventDefault();
+            if (!isAppReady) return showMessage("Aguardando inicialização do sistema...", 'error');
+
+            // 1. Coleta os dados do formulário
+            const isEditing = editingHearingId !== null;
+            const actionText = isEditing ? 'Salvar Alterações' : 'Cadastrar Audiência';
+            submitBtn.textContent = isEditing ? 'Atualizando...' : 'Salvando...';
+            submitBtn.disabled = true;
+
+            const hearingData = {
+                id: isEditing ? editingHearingId : crypto.randomUUID(), 
+                caseNumber: document.getElementById('case-number').value.trim(),
+                date: document.getElementById('date').value,
+                time: document.getElementById('time').value,
+                vara: document.getElementById('vara').value.trim(),
+                reclamada: document.getElementById('reclamada').value.trim(),
+                reclamante: document.getElementById('reclamante').value.trim(),
+                natureza: document.getElementById('natureza').value.trim(),
+                patrono: document.getElementById('patrono').value.trim(),
+                tipoAudiencia: document.getElementById('tipo-audiencia').value.trim(),
+                enderecoTipo: enderecoTipoSelect.value, 
+                enderecoLink: enderecoLinkInput.value.trim(),
+                testemunha: document.getElementById('testemunha').value.trim(),
+                preposto: document.getElementById('preposto').value.trim(),
+                description: document.getElementById('description').value.trim(),
+            };
+            
+            try {
+                let existingHearings = getHearingsFromLocalStorage();
+
+                if (isEditing) {
+                    // Lógica de EDIÇÃO/ATUALIZAÇÃO
+                    const index = existingHearings.findIndex(h => h.id === editingHearingId);
+                    if (index !== -1) {
+                        existingHearings[index] = hearingData;
+                        showMessage('Audiência atualizada com sucesso!', 'success');
+                    } else {
+                        throw new Error("ID de audiência para edição não encontrado.");
+                    }
+                } else {
+                    // Lógica de NOVO CADASTRO
+                    existingHearings.push(hearingData);
+                    showMessage('Audiência cadastrada com sucesso!', 'success');
+                }
+
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(existingHearings));
+
+                cancelEdit(); // Reseta o formulário e o estado de edição
+                loadHearings(); // Recarrega a lista
+            } catch (error) {
+                console.error("Erro ao salvar audiência no localStorage:", error);
+                showMessage(`Erro ao salvar: ${error.message}`, 'error');
+            } finally {
+                submitBtn.textContent = actionText; // Volta ao texto original (Salvar ou Cadastrar)
+                submitBtn.disabled = false;
+            }
+        }
+
+        /** Remove uma audiência do localStorage. */
+        async function deleteHearing(docId) {
+            if (!isAppReady) return showMessage("Aguardando inicialização do sistema...", 'error');
+
+            try {
+                let existingHearings = getHearingsFromLocalStorage();
+                const updatedHearings = existingHearings.filter(h => h.id !== docId);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedHearings));
+
+                showMessage('Audiência excluída com sucesso!', 'success');
+                loadHearings(); // Recarrega a lista
+                cancelEdit(); // Limpa o formulário caso a audiência excluída estivesse sendo editada
+            } catch (error) {
+                console.error("Erro ao excluir audiência:", error);
+                showMessage(`Erro ao excluir: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * Renderiza a lista de audiências.
+         */
+        function renderHearings(hearings) {
+            hearingsList.innerHTML = '';
+            const now = new Date();
+
+            if (hearings.length === 0) {
+                noHearingsMessage.classList.remove('hidden');
+                return;
+            }
+            noHearingsMessage.classList.add('hidden');
+
+            // Ordena cronologicamente: do mais próximo/futuro para o mais distante/passado.
+            hearings.sort((a, b) => {
+                const dateA = new Date(`${a.date}T${a.time}:00`);
+                const dateB = new Date(`${b.date}T${b.time}:00`);
+                return dateA - dateB; // Crescente: garante que a próxima audiência esteja no topo
             });
             
-            const upcomingHearings = processedHearings
-                .filter(h => h.dataHora && new Date(h.dataHora) > new Date()) // Filtra apenas futuras
-                .slice(0, 5);
+            // Separa em Próximas (Futuro) e Realizadas (Passado)
+            const upcomingHearings = hearings.filter(h => new Date(`${h.date}T${h.time}:00`) >= now);
+            const pastHearings = hearings.filter(h => new Date(`${h.date}T${h.time}:00`) < now);
 
-            let html = `
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                    <!-- Cards de status em bg-gray-800 -->
-                    <div class="bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-indigo-500">
-                        <p class="text-lg font-semibold text-gray-400">Total de Audiências</p>
-                        <p class="text-4xl font-extrabold text-white">${processedHearings.length}</p>
-                    </div>
-                    <div class="bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-green-500">
-                        <p class="text-lg font-semibold text-gray-400">Próximas (Em Preparação/Agendada)</p>
-                        <p class="text-4xl font-extrabold text-white">${processedHearings.filter(h => !h.isOverdue && (h.status === 'Em Preparacao' || h.status === 'Agendada')).length}</p>
-                    </div>
-                    <div class="bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-red-500">
-                        <p class="text-lg font-semibold text-gray-400">Prioridade Alta (Pendentes/Atrasadas)</p>
-                        <p class="text-4xl font-extrabold text-white">${processedHearings.filter(h => h.prioridade === 'Alta' && h.status !== 'Realizada').length}</p>
-                    </div>
-                </div>
-
-                <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-gray-700 pb-2">5 Próximas Audiências</h2>
-                <div class="space-y-4">
-            `;
-
-            if (upcomingHearings.length === 0) {
-                html += `<div class="p-6 text-center text-gray-400 italic bg-gray-800 rounded-xl shadow-md">Nenhuma audiência futura agendada.</div>`;
-            } else {
-                upcomingHearings.forEach(h => {
-                    html += renderCard(h);
-                });
-            }
-
-            html += `</div>`;
-            document.getElementById('content-container').innerHTML = html;
-        }
-
-        function renderCalendar() {
-            const now = new Date();
-            // Filtra audiências que não foram realizadas OU que estão no futuro
-            const relevantHearings = allHearings.filter(h => h.dataHora && (h.status !== 'Realizada' || new Date(h.dataHora) >= now));
-
-            // Agrupa por dia (apenas a parte da data)
-            const hearingsByDay = relevantHearings.reduce((acc, h) => {
-                const dateKey = h.dataHora.substring(0, 10);
-                if (!acc[dateKey]) acc[dateKey] = [];
-                
-                // Calcula se está atrasada para renderização
-                const dateObj = new Date(h.dataHora);
-                const isOverdue = dateObj < now && h.status !== 'Realizada';
-                
-                acc[dateKey].push({ ...h, isOverdue: isOverdue });
-                return acc;
-            }, {});
-
-            let html = `<h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-gray-700 pb-2">Visão Calendário (Próximos Eventos)</h2>`;
-
-            const sortedDates = Object.keys(hearingsByDay).sort();
-            
-            // Inclui o dia de hoje e todos os futuros
-            const startOfDayToday = new Date();
-            startOfDayToday.setHours(0,0,0,0);
-
-            const futureDates = sortedDates.filter(date => new Date(date + 'T00:00:00') >= startOfDayToday);
-
-            if (futureDates.length === 0) {
-                 html += `<div class="p-6 text-center text-gray-400 italic bg-gray-800 rounded-xl shadow-md">Nenhuma audiência futura ou em andamento.</div>`;
-            } else {
-                html += `<div class="space-y-8">`;
-                futureDates.forEach(dateKey => {
-                    const date = new Date(dateKey + 'T00:00:00');
-                    const dayName = date.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
-                    
-                    html += `
-                        <div class="border-l-4 border-indigo-500 pl-4">
-                            <h3 class="text-xl font-semibold text-indigo-400 mb-3">${dayName}</h3>
-                            <div class="space-y-4">
-                    `;
-                    
-                    // Ordena os eventos dentro do dia por horário
-                    hearingsByDay[dateKey].sort((a, b) => new Date(a.dataHora) - new Date(b.dataHora)).forEach(h => {
-                        html += renderCard(h);
-                    });
-
-                    html += `
-                            </div>
-                        </div>
-                    `;
-                });
-                html += `</div>`;
-            }
-
-            document.getElementById('content-container').innerHTML = html;
-        }
-
-        function renderKanban() {
-            const statuses = [
-                { key: 'Em Preparacao', title: 'Em Preparação', color: 'purple-400' },
-                { key: 'Agendada', title: 'Agendada', color: 'green-400' },
-                { key: 'Atrasada', title: 'Atrasada', color: 'yellow-400' },
-                { key: 'Realizada', title: 'Realizada', color: 'cyan-400' }
+            // Combina novamente para exibição: Próximas no topo (ordem crescente), seguidas pelas Realizadas (ordem decrescente)
+            const finalHearings = [
+                ...upcomingHearings,
+                ...pastHearings.sort((a, b) => { // Inverte a ordem das passadas (mais recente no topo do grupo)
+                    const dateA = new Date(`${a.date}T${a.time}:00`);
+                    const dateB = new Date(`${b.date}T${b.time}:00`);
+                    return dateB - dateA; 
+                })
             ];
 
-            let html = `
-                <h2 class="text-2xl font-bold text-gray-200 mb-4 border-b border-gray-700 pb-2">Kanban de Audiências (Status)</h2>
-                <div class="kanban-container flex space-x-6 pb-4">
-            `;
+            const daysOfWeek = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+            let lastGroupHeader = null;
 
-            const now = new Date();
+            finalHearings.forEach(h => {
+                const hearingDateTime = new Date(`${h.date}T${h.time}:00`);
+                const isPast = hearingDateTime < now;
+                
+                // Calcula a diferença para o alerta de 1 dia (24 horas)
+                const timeDifference = hearingDateTime.getTime() - now.getTime();
+                const isImminent = timeDifference > 0 && timeDifference <= (24 * 60 * 60 * 1000); // Menos de 24h
 
-            statuses.forEach(status => {
-                const columnHearings = allHearings.filter(h => {
-                    const dateObj = new Date(h.dataHora);
-                    // Lógica para determinar o status de exibição: prioriza Atrasada se for passado
-                    const isOverdue = dateObj < now && h.status !== 'Realizada';
-                    const displayStatus = isOverdue ? 'Atrasada' : h.status;
-                    return displayStatus === status.key;
-                });
+                let groupHeader = isPast ? "Audiências Realizadas" : "Próximas Audiências";
 
-                html += `
-                    <!-- Coluna com fundo gray-700 para contraste -->
-                    <div class="kanban-column bg-gray-700 p-4 rounded-xl shadow-inner flex-shrink-0">
-                        <h3 class="text-lg font-bold text-${status.color} mb-4">${status.title} (${columnHearings.length})</h3>
-                        <div class="space-y-4">
-                            ${columnHearings.map(h => renderCard(h)).join('')}
-                            <div class="p-2 text-sm text-gray-400 italic text-center border border-dashed border-gray-500 rounded-lg">
-                                ${columnHearings.length === 0 ? 'Nenhuma audiência neste status.' : ''}
-                            </div>
+                if (groupHeader !== lastGroupHeader) {
+                    hearingsList.innerHTML += `
+                        <h3 class="text-2xl font-extrabold ${isPast ? 'text-gray-500 border-gray-400' : 'text-navy-main border-yellow-500'} mt-8 mb-4 border-b-2 pb-1">
+                            ${groupHeader}
+                        </h3>
+                    `;
+                    lastGroupHeader = groupHeader;
+                }
+
+                const card = document.createElement('div');
+                const docId = h.id; 
+                
+                // Aplica a classe de piscar (flash-alert) se for iminente
+                card.className = `p-4 lg:p-6 rounded-xl shadow-md transition duration-300 relative group 
+                                  ${isImminent ? 'flash-alert' : (isPast ? 'bg-gray-100 border-l-4 border-gray-400 opacity-80' : 'bg-white border-l-4 border-yellow-500 hover:shadow-lg')}
+                                  ${isImminent ? 'border-yellow-500' : (isPast ? 'border-gray-400' : 'border-yellow-500')}`;
+
+                // Ícone para indicar Presencial/Virtual (Azul Marinho para bom contraste)
+                const iconSVG = h.enderecoTipo === 'Virtual' 
+                    ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-navy-main" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-7-8a7 7 0 1114 0 7 7 0 01-14 0zm7 3a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" /></svg>`
+                    : `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-navy-main" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" /></svg>`;
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <!-- Data e Hora -->
+                        <div class="flex items-center">
+                            ${iconSVG}
+                            <p class="text-xl-tv font-bold text-navy-main">${daysOfWeek[hearingDateTime.getDay()]}, ${formatDateForDisplay(h.date)} às ${h.time}h</p>
+                            ${isPast ? '<span class="ml-3 text-sm font-semibold text-gray-600 bg-gray-200 px-2 py-0.5 rounded-full">REALIZADA</span>' : (isImminent ? '<span class="ml-3 text-sm font-semibold text-navy-main bg-yellow-200 px-2 py-0.5 rounded-full">IMINENTE</span>' : '')}
+                        </div>
+                        
+                        <!-- Botões de Ação (Editar e Excluir) -->
+                        <div class="flex space-x-2 opacity-0 group-hover:opacity-100 transition duration-300 absolute top-2 right-2">
+                            <!-- Botão de Editar (Amarelo) -->
+                            <button data-id="${docId}" class="edit-btn text-yellow-500 hover:text-yellow-700 p-1 rounded-full bg-white shadow-md" aria-label="Editar Audiência">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zm-1.414 4.316l-7.85-7.85A1 1 0 001.05 3.121v14.757a1 1 0 001.05.793h14.757a1 1 0 00.793-1.05V7.9l-2.613-2.613 1.414-1.414z" fill-rule="evenodd" clip-rule="evenodd" /></svg>
+                            </button>
+                            <!-- Botão de Excluir (Vermelho - cor de alerta mantida) -->
+                            <button data-id="${docId}" class="delete-btn text-red-500 hover:text-red-700 p-1 rounded-full bg-white shadow-md" aria-label="Excluir Audiência">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.728-1.447A1 1 0 0011 2H9zM7 7a1 1 0 011 1v6a1 1 0 11-2 0V8a1 1 0 011-1zm5 0a1 1 0 011 1v6a1 1 0 11-2 0V8a1 1 0 011-1z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
                         </div>
                     </div>
+
+                    <!-- Informações Principais (Azul Marinho para contraste) -->
+                    <p class="text-lg-tv font-extrabold text-navy-main break-words">${h.caseNumber} - ${h.tipoAudiencia}</p>
+                    <p class="text-md-tv text-gray-700"><span class="font-semibold">Vara:</span> ${h.vara}</p>
+                    
+                    <!-- Partes -->
+                    <p class="text-md-tv text-gray-600"><span class="font-semibold">Partes:</span> ${h.reclamante} <span class="text-gray-400">vs</span> ${h.reclamada} (${h.natureza})</p>
+
+                    <!-- Detalhes de Local/Link (Amarelo) -->
+                    <p class="text-md-tv mt-2">
+                        <span class="font-semibold">${h.enderecoTipo}:</span> 
+                        ${h.enderecoTipo === 'Virtual' 
+                            ? `<a href="${h.enderecoLink}" target="_blank" class="text-yellow-600 hover:text-yellow-700 underline truncate max-w-full inline-block">${h.enderecoLink}</a>`
+                            : `${h.enderecoLink}`}
+                    </p>
+                    
+                    <!-- Detalhes Secundários -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 text-sm text-gray-500 mt-2 border-t pt-2">
+                        <p class="truncate"><span class="font-semibold">Patrono:</span> ${h.patrono || 'N/A'}</p>
+                        <p class="truncate"><span class="font-semibold">Preposto:</span> ${h.preposto || 'N/A'}</p>
+                    </div>
+
+                    <!-- Observações -->
+                    ${h.description ? `<p class="text-sm italic text-gray-500 mt-2">${h.description}</p>` : ''}
                 `;
+                hearingsList.appendChild(card);
             });
 
-            html += `</div>`;
-            document.getElementById('content-container').innerHTML = html;
+            // Adiciona listeners para os botões de ação (Excluir e Editar)
+            document.querySelectorAll('.delete-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.stopPropagation(); 
+                    const docId = e.currentTarget.getAttribute('data-id');
+                    confirmDeleteBtn.setAttribute('data-doc-id', docId);
+                    confirmModal.classList.remove('hidden');
+                });
+            });
+
+            document.querySelectorAll('.edit-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.stopPropagation(); 
+                    const docId = e.currentTarget.getAttribute('data-id');
+                    startEdit(docId);
+                });
+            });
         }
 
-
-        // --- Controle de Vistas e Inicialização ---
-
-        function renderCurrentView() {
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('border-indigo-500', 'text-indigo-400');
-                btn.classList.add('border-transparent', 'text-gray-400', 'hover:border-gray-600', 'hover:text-gray-200');
-                if (btn.dataset.view === currentView) {
-                    btn.classList.add('border-indigo-500', 'text-indigo-400');
-                    btn.classList.remove('border-transparent', 'text-gray-400', 'hover:border-gray-600', 'hover:text-gray-200');
-                }
-            });
-
-            const container = document.getElementById('content-container');
+        /** Carrega e filtra todas as audiências a partir do localStorage. */
+        function loadHearings() {
+            if (!isAppReady) {
+                console.warn("App não pronta. Tentando novamente...");
+                return; 
+            }
             
-            if (allHearings.length === 0) {
-                container.innerHTML = `<div class="p-8 text-center text-gray-400">Nenhuma audiência encontrada. Adicione uma nova para começar.</div>`;
-            }
+            try {
+                const allHearings = getHearingsFromLocalStorage();
+                renderHearings(allHearings);
 
-            if (currentView === 'dashboard') {
-                renderDashboard();
-            } else if (currentView === 'calendar') {
-                renderCalendar();
-            } else if (currentView === 'kanban') {
-                renderKanban();
+            } catch (error) {
+                console.error("Erro ao carregar dados do localStorage:", error);
+                showMessage(`Erro ao carregar dados: ${error.message}`, 'error');
             }
         }
 
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                currentView = e.target.dataset.view;
-                renderCurrentView();
-            });
+        // --- Event Listeners ---
+
+        form.addEventListener('submit', saveHearing);
+        enderecoTipoSelect.addEventListener('change', updateAddressLabel);
+
+        confirmDeleteBtn.addEventListener('click', () => {
+            const docId = confirmDeleteBtn.getAttribute('data-doc-id');
+            if (docId) {
+                deleteHearing(docId);
+            }
+            confirmModal.classList.add('hidden');
+            confirmDeleteBtn.removeAttribute('data-doc-id');
         });
 
-        // Inicializa a aplicação
-        function initApp() {
-            loadHearingsFromLocalStorage();
-            renderCurrentView();
-            check48hAlerts();
-        }
+        cancelDeleteBtn.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+            confirmDeleteBtn.removeAttribute('data-doc-id');
+        });
 
-        window.onload = initApp;
+        // Inicializa o app ao carregar a janela
+        window.onload = initializeApp;
+
     </script>
 </body>
 </html>
